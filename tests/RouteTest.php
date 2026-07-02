@@ -22,12 +22,24 @@ final class RouteTest extends PwTestCase
         $this->assertSame(401, $resp['status']);
     }
 
-    public function test_mcp_empty_key_reports_disabled(): void
+    public function test_mcp_empty_key_reports_unauthorized(): void
     {
         $resp = pw_route_mcp(['HTTP_HOST' => 'x'], '{}', '', $this->mcpCtx());
         $this->assertSame(401, $resp['status']);
         $body = json_decode($resp['body'], true);
-        $this->assertStringContainsString('MCP_KEY', $body['error']['message']);
+        $this->assertSame('Unauthorized', $body['error']['message']);
+    }
+
+    public function test_mcp_401_body_does_not_distinguish_disabled_from_unauthorized(): void
+    {
+        // No info leak: empty key and bad token must yield identical bodies.
+        $disabled = pw_route_mcp(['HTTP_HOST' => 'x'], '{}', '', $this->mcpCtx());
+        $badtoken = pw_route_mcp(['HTTP_AUTHORIZATION' => 'Bearer wrong'], '{}', $this->mcpKey(), $this->mcpCtx());
+        $this->assertSame(401, $disabled['status']);
+        $this->assertSame(401, $badtoken['status']);
+        $this->assertSame($disabled['body'], $badtoken['body']);
+        $decoded = json_decode($disabled['body'], true);
+        $this->assertSame('Unauthorized', $decoded['error']['message']);
     }
 
     public function test_mcp_valid_auth_initialize(): void

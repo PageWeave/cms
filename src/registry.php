@@ -68,6 +68,7 @@ function pw_mcp_tool_registry(): array
                     'html' => $htmlSchema,
                     'replacements' => [
                         'type' => 'array',
+                        'maxItems' => 10,
                         'items' => [
                             'type' => 'object',
                             'properties' => [
@@ -141,10 +142,13 @@ function pw_mcp_tool_registry(): array
 /**
  * Dispatch a tool call. Validates required arguments, runs the handler inside
  * a try/catch, and always returns an MCP tool-result array ({content, isError}).
+ *
+ * $registryOverride is a test seam (used to inject a throwing handler); in
+ * production the canonical registry from pw_mcp_tool_registry() is used.
  */
-function pw_mcp_dispatch_tool(string $name, array $args, array $ctx): array
+function pw_mcp_dispatch_tool(string $name, array $args, array $ctx, ?array $registryOverride = null): array
 {
-    $tools = pw_mcp_tool_registry();
+    $tools = $registryOverride ?? pw_mcp_tool_registry();
     if (!isset($tools[$name])) {
         return pw_tool_error("Unknown tool: $name");
     }
@@ -157,6 +161,16 @@ function pw_mcp_dispatch_tool(string $name, array $args, array $ctx): array
     try {
         return ($tool['handler'])($args, $ctx);
     } catch (\Throwable $e) {
-        return pw_tool_error('Tool error: ' . $e->getMessage());
+        // Never surface internals (paths, exception messages) to the client;
+        // log the detail server-side for the operator.
+        error_log(sprintf(
+            'PageWeave tool %s error: %s: %s in %s:%d',
+            $name,
+            get_class($e),
+            $e->getMessage(),
+            $e->getFile(),
+            $e->getLine()
+        ));
+        return pw_tool_error('Tool error');
     }
 }

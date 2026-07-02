@@ -123,8 +123,10 @@ function pw_dispatch_jsonrpc(array $request, array $ctx): ?array
 function pw_route_mcp(array $server, string $body, string $mcpKey, array $ctx): array
 {
     if ($mcpKey === '' || !pw_check_auth($server['HTTP_AUTHORIZATION'] ?? null, $mcpKey)) {
-        $message = $mcpKey === '' ? 'MCP disabled (set MCP_KEY in index.php)' : 'Unauthorized';
-        return pw_response(401, 'application/json', json_encode(pw_jsonrpc_error(null, -32001, $message)));
+        // Identical response for "disabled" and "bad token": the install page
+        // already communicates MCP_KEY status to the operator, so a probing
+        // client must not learn whether MCP is enabled.
+        return pw_response(401, 'application/json', json_encode(pw_jsonrpc_error(null, -32001, 'Unauthorized')));
     }
 
     $decoded = json_decode($body, true);

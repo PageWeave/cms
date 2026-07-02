@@ -201,4 +201,49 @@ final class ToolsTest extends PwTestCase
         $this->assertCount(1, $data['assets']);
         $this->assertSame('/assets/logo.png', $data['assets'][0]['url']);
     }
+
+    // ---- Tier 3: replacements cap + exception leak ------------------------
+
+    public function test_update_page_replacements_capped_at_ten(): void
+    {
+        pw_create_page($this->cmsDir(), 'about', str_repeat('x', 200), null, null);
+        $replacements = [];
+        for ($i = 0; $i < 11; $i++) {
+            $replacements[] = ['old_html' => 'x', 'new_html' => 'y'];
+        }
+        $r = pw_tool_update_page(['path' => 'about', 'replacements' => $replacements], $this->ctx());
+        $this->assertTrue($r['isError']);
+        $this->assertStringContainsString('10', $r['content'][0]['text']);
+    }
+
+    public function test_update_page_ten_replacements_allowed(): void
+    {
+        pw_create_page($this->cmsDir(), 'about', str_repeat('x', 10), null, null);
+        $replacements = [];
+        for ($i = 0; $i < 10; $i++) {
+            $replacements[] = ['old_html' => 'x', 'new_html' => 'y'];
+        }
+        $r = pw_tool_update_page(['path' => 'about', 'replacements' => $replacements], $this->ctx());
+        $this->assertFalse($r['isError']);
+    }
+
+    public function test_tool_exception_returns_generic_message_no_path_leak(): void
+    {
+        // A handler that throws must surface a generic message, never internals.
+        $registry = ['boom' => [
+            'description' => 'test',
+            'inputSchema' => ['type' => 'object', 'properties' => new \stdClass(), 'required' => []],
+            'handler' => 'pw_test_throwing_handler',
+        ]];
+        $result = pw_mcp_dispatch_tool('boom', [], $this->ctx(), $registry);
+        $this->assertTrue($result['isError']);
+        $this->assertSame('Tool error', $result['content'][0]['text']);
+        $this->assertStringNotContainsString('/var/www', $result['content'][0]['text']);
+        $this->assertStringNotContainsString('sensitive', $result['content'][0]['text']);
+    }
+}
+
+function pw_test_throwing_handler(array $args, array $ctx): array
+{
+    throw new \RuntimeException('sensitive detail /var/www/secret.php');
 }

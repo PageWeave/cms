@@ -245,6 +245,9 @@ function pw_list_assets(string $docRoot): array
 
 function pw_apply_replacements(string $html, array $replacements): array
 {
+    if (count($replacements) > 10) {
+        return ['ok' => false, 'error' => 'too many replacements (max 10)'];
+    }
     foreach ($replacements as $index => $replacement) {
         $old = $replacement['old_html'] ?? null;
         $new = $replacement['new_html'] ?? '';
