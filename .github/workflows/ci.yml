@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test, build, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: json, mbstring, pcre
+          coverage: none
+          ini-values: error_reporting=E_ALL
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.json') }}
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Coding standards
+        run: vendor/bin/php-cs-fixer fix --dry-run --allow-risky=yes
+
+      - name: Tests
+        run: vendor/bin/phpunit --colors=never
+
+      - name: Build single file
+        run: php build.php
+
+      - name: Lint build
+        run: php -l dist/index.php
+
+      - name: Upload built index.php
+        uses: actions/upload-artifact@v4
+        with:
+          name: index-php
+          path: dist/index.php
+          if-no-files-found: error

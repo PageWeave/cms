@@ -1,0 +1,47 @@
+name: Release
+
+# On a version tag (v*), run the full suite, build the single file, and attach
+# it (versioned) to a GitHub Release so users get a drop-in download.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: json, mbstring, pcre
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Tests
+        run: vendor/bin/phpunit --colors=never
+
+      - name: Build single file
+        run: php build.php
+
+      - name: Lint build
+        run: php -l dist/index.php
+
+      - name: Version the artifact
+        run: cp dist/index.php "pageweave-cms-${GITHUB_REF_NAME}.php"
+
+      - name: Create release with artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pageweave-cms-${{ github.ref_name }}.php
+          generate_release_notes: true
