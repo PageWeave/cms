@@ -37,8 +37,13 @@ no database, no runtime dependencies, no build step required to use it.
    ```php
    const MCP_KEY = 'change-me-to-a-long-random-string';
    ```
-3. **Upload it** to your web server's document root **as `index.php`**.
-4. **Visit your domain.** On first load the CMS auto-detects your server (Apache/LiteSpeed/nginx),
+3. **(Production) Set `SITE_URL`** to your canonical URL so the install page stops trusting the
+   client-controlled `Host` header:
+   ```php
+   const SITE_URL = 'https://example.com';
+   ```
+4. **Upload it** to your web server's document root **as `index.php`**.
+5. **Visit your domain.** On first load the CMS auto-detects your server (Apache/LiteSpeed/nginx),
    writes the routing config, scaffolds `_cms/`, and shows an **"Installation successful"** page
    with your MCP endpoint URL and agent setup instructions.
 
@@ -85,6 +90,7 @@ Edit these at the top of `index.php`:
 | Constant | Purpose | Default |
 |---|---|---|
 | `MCP_KEY` | Bearer token for `/mcp`. Empty ⇒ MCP disabled (site still serves). | `''` |
+| `SITE_URL` | Canonical base URL (e.g. `https://example.com`). Used for the install-page MCP endpoint instead of the `Host` header. **Strongly recommended on production** to avoid trusting a client-controlled header. | `''` |
 | `SOURCE_URL` | Where your source lives (AGPL §13 "Source" link). | upstream repo |
 | `SITE_TITLE` | Fallback `<title>` for pages without one. | `'My Site'` |
 | `CMS_DIR` | Location of the `_cms/` data directory. | `<docroot>/_cms` |
