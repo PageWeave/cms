@@ -79,18 +79,40 @@ function pw_cms_deny_content(): string
     return "Require all denied\n";
 }
 
-function pw_install_page_html(string $host, string $mcpPath, bool $mcpEnabled, string $sourceUrl): string
+/**
+ * Resolve the host shown on the install page. The Host header is fully
+ * attacker-controlled, so prefer a configured SITE_URL; otherwise allowlist-
+ * validate HTTP_HOST and fall back to 'localhost'. Anything reaching the output
+ * is still htmlspecialchars'd, but rejecting obviously-malicious values here
+ * avoids persisting garbage (or a poisoned endpoint) into the homepage.
+ */
+function pw_resolve_host(string $siteUrl, string $httpHost): string
 {
-    $endpoint = 'https://' . $host . $mcpPath;
+    if ($siteUrl !== '') {
+        $h = parse_url($siteUrl, PHP_URL_HOST);
+        if (is_string($h) && $h !== '') {
+            return $h;
+        }
+    }
+    if ($httpHost !== '' && preg_match('/^[A-Za-z0-9._:\[\]-]+$/', $httpHost)) {
+        return $httpHost;
+    }
+    return 'localhost';
+}
+
+function pw_install_page_html(string $host, string $mcpPath, bool $mcpEnabled, string $sourceUrl, string $scheme = 'https'): string
+{
+    $safeHost = htmlspecialchars($host, ENT_QUOTES, 'UTF-8');
+    $endpoint = $scheme . '://' . $safeHost . $mcpPath;
     $snippet = json_encode([
         'mcp' => [
             'pageweave-cms' => [
                 'type' => 'remote',
-                'url' => $endpoint,
+                'url' => $scheme . '://' . $host . $mcpPath,
                 'headers' => ['Authorization' => 'Bearer YOUR_MCP_KEY'],
             ],
         ],
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
     $notice = $mcpEnabled
         ? '<p style="color:#16a34a;font-weight:600;">✅ MCP is enabled.</p>'
@@ -140,7 +162,8 @@ function pw_run_setup(
     string $mcpPath,
     bool $mcpEnabled,
     string $siteTitle,
-    string $sourceUrl
+    string $sourceUrl,
+    string $scheme = 'https'
 ): array {
     @mkdir($cmsDir . '/partials', 0775, true);
     @mkdir($cmsDir . '/pages', 0775, true);
@@ -154,7 +177,7 @@ function pw_run_setup(
     if (!is_file($indexFile)) {
         file_put_contents(
             $indexFile,
-            pw_install_page_html($host, $mcpPath, $mcpEnabled, $sourceUrl),
+            pw_install_page_html($host, $mcpPath, $mcpEnabled, $sourceUrl, $scheme),
             LOCK_EX
         );
     }

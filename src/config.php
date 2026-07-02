@@ -20,6 +20,11 @@ const MCP_KEY = '';
 // If you run a modified version, point this at your published source.
 const SOURCE_URL = 'https://github.com/PageWeave/cms';
 
+// Optional canonical base URL (e.g. 'https://example.com'). When set, the
+// install page uses this host/scheme for the MCP endpoint instead of trusting
+// the client-supplied Host header. Strongly recommended on production sites.
+const SITE_URL = '';
+
 // Fallback <title> for pages that do not set one.
 const SITE_TITLE = 'My Site';
 

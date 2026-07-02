@@ -44,7 +44,7 @@ function pw_router_main(): void
             $ctx
         );
     } else {
-        $resp = pw_route_get($_SERVER, $docRoot, CMS_DIR, SITE_TITLE, SOURCE_URL, MCP_KEY);
+        $resp = pw_route_get($_SERVER, $docRoot, CMS_DIR, SITE_TITLE, SOURCE_URL, MCP_KEY, SITE_URL);
     }
 
     pw_emit($resp);

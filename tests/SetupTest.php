@@ -107,6 +107,45 @@ final class SetupTest extends PwTestCase
         $this->assertTrue(pw_is_installed($cms));
     }
 
+    // ---- host resolution (Tier 1: Host-header XSS hardening) --------------
+
+    public function test_resolve_host_prefers_site_url_host(): void
+    {
+        $this->assertSame('configured.example', pw_resolve_host('https://configured.example/foo', 'evil.com'));
+    }
+
+    public function test_resolve_host_falls_back_to_valid_http_host(): void
+    {
+        $this->assertSame('example.com', pw_resolve_host('', 'example.com'));
+        $this->assertSame('example.com:8080', pw_resolve_host('', 'example.com:8080'));
+    }
+
+    public function test_resolve_host_rejects_malicious_http_host(): void
+    {
+        $this->assertSame('localhost', pw_resolve_host('', '"><script>alert(1)</script>'));
+        $this->assertSame('localhost', pw_resolve_host('', "evil.com\r\nX: y"));
+        $this->assertSame('localhost', pw_resolve_host('', '<b>x</b>'));
+    }
+
+    public function test_install_page_escapes_host_xss_payloads(): void
+    {
+        // A malicious Host must not appear as live HTML; its escaped form must.
+        $html = pw_install_page_html('"><svg onload=alert(1)>', '/mcp', true, 'https://src');
+        $this->assertStringNotContainsString('"><svg onload=alert(1)>', $html);
+        $this->assertStringContainsString('&quot;&gt;&lt;svg', $html);
+
+        $html2 = pw_install_page_html('<script>alert(1)</script>', '/mcp', true, 'https://src');
+        $this->assertStringNotContainsString('<script>alert(1)</script>', $html2);
+        $this->assertStringContainsString('&lt;script&gt;', $html2);
+    }
+
+    public function test_install_page_endpoint_uses_site_url_scheme(): void
+    {
+        $html = pw_install_page_html('example.com', '/mcp', true, 'https://src', 'http');
+        $this->assertStringContainsString('http://example.com/mcp', $html);
+        $this->assertStringNotContainsString('https://example.com/mcp', $html);
+    }
+
     public function test_run_setup_idempotent_does_not_clobber_existing_pages(): void
     {
         $docRoot = $this->webroot();

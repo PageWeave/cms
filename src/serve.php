@@ -51,12 +51,17 @@ function pw_route_get(
     string $cmsDir,
     string $siteTitle,
     string $sourceUrl,
-    string $mcpKey
+    string $mcpKey,
+    string $siteUrl = ''
 ): array {
     if (!pw_is_installed($cmsDir)) {
-        $host = $server['HTTP_HOST'] ?? 'localhost';
+        $httpHost = $server['HTTP_HOST'] ?? '';
+        $scheme = ($siteUrl !== '' && is_string(parse_url($siteUrl, PHP_URL_SCHEME)))
+            ? (string) parse_url($siteUrl, PHP_URL_SCHEME)
+            : 'https';
+        $host = pw_resolve_host($siteUrl, $httpHost);
         $software = $server['SERVER_SOFTWARE'] ?? '';
-        pw_run_setup($docRoot, $cmsDir, $software, $host, '/mcp', $mcpKey !== '', $siteTitle, $sourceUrl);
+        pw_run_setup($docRoot, $cmsDir, $software, $host, '/mcp', $mcpKey !== '', $siteTitle, $sourceUrl, $scheme);
     }
 
     $slug = pw_path_from_uri($server['REQUEST_URI'] ?? '/');
