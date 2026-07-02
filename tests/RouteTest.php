@@ -159,4 +159,25 @@ final class RouteTest extends PwTestCase
         $resp = pw_route_get(['REQUEST_URI' => '/index.php/about'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
         $this->assertSame(200, $resp['status']);
     }
+
+    public function test_get_encoded_traversal_is_404(): void
+    {
+        // pages/ always exists in a real install; create it so the escaped path
+        // ../partials/header.html would actually resolve without a guard.
+        @mkdir($this->cmsDir() . '/pages', 0775, true);
+        pw_write_partial($this->cmsDir(), 'header', '<h>SECRET</h>');
+        $this->markInstalled();
+        $resp = pw_route_get(['REQUEST_URI' => '/..%2fpartials%2fheader'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $this->assertSame(404, $resp['status']);
+        $this->assertStringNotContainsString('SECRET', $resp['body']);
+    }
+
+    public function test_get_valid_nested_page_still_resolves(): void
+    {
+        pw_create_page($this->cmsDir(), 'blog/post-1', '<p>nested</p>', null, null);
+        $this->markInstalled();
+        $resp = pw_route_get(['REQUEST_URI' => '/blog/post-1'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $this->assertSame(200, $resp['status']);
+        $this->assertStringContainsString('nested', $resp['body']);
+    }
 }

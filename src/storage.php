@@ -100,11 +100,17 @@ function pw_serialize_page(string $html, ?string $title, ?string $description): 
 
 function pw_page_exists(string $base, string $slug): bool
 {
+    if (pw_validate_slug($slug) !== null) {
+        return false;
+    }
     return is_file(pw_slug_to_file($base, $slug));
 }
 
 function pw_get_page(string $base, string $slug): ?array
 {
+    if (pw_validate_slug($slug) !== null) {
+        return null;
+    }
     $file = pw_slug_to_file($base, $slug);
     if (!is_file($file)) {
         return null;

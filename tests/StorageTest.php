@@ -105,6 +105,29 @@ final class StorageTest extends PwTestCase
         $this->assertNull(pw_get_page($this->cmsDir(), 'nope'));
     }
 
+    public function test_get_page_rejects_traversal_slug(): void
+    {
+        // pages/ always exists in production; without a read-path guard the
+        // escaped path ../partials/header.html resolves and leaks the partial.
+        @mkdir($this->cmsDir() . '/pages', 0775, true);
+        pw_write_partial($this->cmsDir(), 'header', '<h>HEADER</h>');
+        $this->assertNull(pw_get_page($this->cmsDir(), '../partials/header'));
+    }
+
+    public function test_page_exists_rejects_traversal_slug(): void
+    {
+        @mkdir($this->cmsDir() . '/pages', 0775, true);
+        pw_write_partial($this->cmsDir(), 'footer', '<f/>');
+        $this->assertFalse(pw_page_exists($this->cmsDir(), '../partials/footer'));
+    }
+
+    public function test_get_page_rejects_reserved_slugs(): void
+    {
+        @mkdir($this->cmsDir() . '/pages', 0775, true);
+        $this->assertNull(pw_get_page($this->cmsDir(), 'mcp'));
+        $this->assertNull(pw_get_page($this->cmsDir(), 'assets'));
+    }
+
     public function test_delete_page(): void
     {
         $cms = $this->cmsDir();
