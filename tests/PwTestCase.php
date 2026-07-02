@@ -62,4 +62,10 @@ abstract class PwTestCase extends TestCase
             'siteTitle' => 'Site',
         ];
     }
+
+    protected function markInstalled(): void
+    {
+        @mkdir($this->cmsDir(), 0775, true);
+        file_put_contents($this->cmsDir() . '/.installed', 'x');
+    }
 }

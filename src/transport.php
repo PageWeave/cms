@@ -101,3 +101,50 @@ function pw_dispatch_jsonrpc(array $request, array $ctx): ?array
             return $isNotification ? null : pw_jsonrpc_method_not_found($id);
     }
 }
+
+/**
+ * MCP HTTP shell: authenticate, decode the JSON-RPC body, dispatch (handling
+ * batches and notifications), and return a response array.
+ *
+ * Takes the $_SERVER-like array and the raw body explicitly so it is testable
+ * without real superglobals. $ctx carries cmsDir/docRoot/siteTitle.
+ */
+function pw_route_mcp(array $server, string $body, string $mcpKey, array $ctx): array
+{
+    if ($mcpKey === '' || !pw_check_auth($server['HTTP_AUTHORIZATION'] ?? null, $mcpKey)) {
+        $message = $mcpKey === '' ? 'MCP disabled (set MCP_KEY in index.php)' : 'Unauthorized';
+        return pw_response(401, 'application/json', json_encode(pw_jsonrpc_error(null, -32001, $message)));
+    }
+
+    $decoded = json_decode($body, true);
+    if ($decoded === null && trim($body) !== '') {
+        return pw_response(400, 'application/json', json_encode(pw_jsonrpc_parse_error()));
+    }
+
+    // JSON-RPC batch request.
+    if (is_array($decoded) && array_is_list($decoded)) {
+        $responses = [];
+        foreach ($decoded as $item) {
+            if (!is_array($item)) {
+                $responses[] = pw_jsonrpc_invalid_request();
+                continue;
+            }
+            $resp = pw_dispatch_jsonrpc($item, $ctx);
+            if ($resp !== null) {
+                $responses[] = $resp;
+            }
+        }
+        return pw_response(200, 'application/json', json_encode($responses));
+    }
+
+    if (!is_array($decoded) || !isset($decoded['jsonrpc'])) {
+        return pw_response(400, 'application/json', json_encode(pw_jsonrpc_invalid_request()));
+    }
+
+    $resp = pw_dispatch_jsonrpc($decoded, $ctx);
+    if ($resp === null) {
+        // Notification — accepted, no response body.
+        return pw_response(202, '', '');
+    }
+    return pw_response(200, 'application/json', json_encode($resp));
+}
