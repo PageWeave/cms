@@ -1,0 +1,25 @@
+{
+    "name": "pageweave/cms",
+    "description": "Self-hostable, single-file PHP CMS with a built-in MCP (Model Context Protocol) server.",
+    "type": "project",
+    "license": "AGPL-3.0-or-later",
+    "require": {
+        "php": ">=8.3",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-pcre": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.0",
+        "friendsofphp/php-cs-fixer": "^3.0"
+    },
+    "scripts": {
+        "test": "phpunit",
+        "build": "php build.php",
+        "fix": "php-cs-fixer fix",
+        "lint": "php -l dist/index.php"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
