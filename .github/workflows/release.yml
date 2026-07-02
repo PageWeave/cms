@@ -1,7 +1,7 @@
 name: Release
 
 # On a version tag (v*), run the full suite, build the single file, and attach
-# it (versioned) to a GitHub Release so users get a drop-in download.
+# it as index.php to a GitHub Release so users get a drop-in download.
 
 on:
   push:
@@ -37,11 +37,8 @@ jobs:
       - name: Lint build
         run: php -l dist/index.php
 
-      - name: Version the artifact
-        run: cp dist/index.php "pageweave-cms-${GITHUB_REF_NAME}.php"
-
-      - name: Create release with artifact
+      - name: Attach index.php to release
         uses: softprops/action-gh-release@v2
         with:
-          files: pageweave-cms-${{ github.ref_name }}.php
+          files: dist/index.php
           generate_release_notes: true
