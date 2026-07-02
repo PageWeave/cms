@@ -82,6 +82,13 @@ function pw_route_get(
     $slug = pw_path_from_uri($server['REQUEST_URI'] ?? '/');
 
     if ($slug === 'mcp') {
+        // Streamable HTTP §Listening: a GET to the MCP endpoint must return
+        // SSE or 405. We don't stream, so MCP clients (which always send
+        // Accept: text/event-stream per the spec) get 405. A browser/curl GET
+        // without that Accept keeps the human-friendly info page.
+        if (str_contains($server['HTTP_ACCEPT'] ?? '', 'text/event-stream')) {
+            return pw_response(405, '', '', ['Allow' => 'POST']);
+        }
         return pw_response(200, 'text/plain; charset=utf-8', 'PageWeave CMS MCP endpoint. Send a JSON-RPC POST request to this URL with an Authorization: Bearer header.');
     }
     if ($slug === '__source') {

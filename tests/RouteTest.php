@@ -227,10 +227,44 @@ final class RouteTest extends PwTestCase
 
     public function test_get_mcp_path_returns_info(): void
     {
+        // A browser/curl GET (no SSE Accept) keeps the human-friendly info page.
         $this->markInstalled();
         $resp = pw_route_get(['REQUEST_URI' => '/mcp'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
         $this->assertSame(200, $resp['status']);
         $this->assertStringContainsString('MCP', $resp['body']);
+    }
+
+    public function test_get_mcp_with_sse_accept_returns_405(): void
+    {
+        // Streamable HTTP §Listening: a GET from an MCP client (which always
+        // sends Accept: text/event-stream) MUST get SSE or 405. We don't
+        // stream, so 405 with Allow: POST.
+        $this->markInstalled();
+        $resp = pw_route_get(
+            ['REQUEST_URI' => '/mcp', 'HTTP_ACCEPT' => 'text/event-stream'],
+            $this->webroot(),
+            $this->cmsDir(),
+            'Site',
+            'https://src',
+            'secret'
+        );
+        $this->assertSame(405, $resp['status']);
+        $this->assertSame('POST', $resp['headers']['Allow'] ?? null);
+    }
+
+    public function test_get_mcp_with_mixed_accept_including_sse_returns_405(): void
+    {
+        // Accept header may list multiple types; SSE presence triggers 405.
+        $this->markInstalled();
+        $resp = pw_route_get(
+            ['REQUEST_URI' => '/mcp', 'HTTP_ACCEPT' => 'application/json, text/event-stream'],
+            $this->webroot(),
+            $this->cmsDir(),
+            'Site',
+            'https://src',
+            'secret'
+        );
+        $this->assertSame(405, $resp['status']);
     }
 
     public function test_get_source_redirects(): void
