@@ -10,6 +10,13 @@ declare(strict_types=1);
  */
 
 /**
+ * The MCP protocol/contract version this server implements. Decoupled from the
+ * implementation version (PW_VERSION): it only changes when we adopt a newer
+ * MCP spec revision. This is the "interface version" clients negotiate against.
+ */
+const MCP_PROTOCOL_VERSION = '2025-06-18';
+
+/**
  * Extract a bearer token from an Authorization header value.
  * Returns null if the header is missing or not a "Bearer <token>" pair.
  */
@@ -67,9 +74,13 @@ function pw_dispatch_jsonrpc(array $request, array $ctx): ?array
     switch ($method) {
         case 'initialize':
             return pw_jsonrpc_success($id, [
-                'protocolVersion' => '2025-06-18',
+                'protocolVersion' => MCP_PROTOCOL_VERSION,
                 'capabilities' => ['tools' => new \stdClass()],
-                'serverInfo' => ['name' => 'PageWeave CMS', 'version' => '0.1.0'],
+                'serverInfo' => [
+                    'name' => 'PageWeave CMS',
+                    'title' => 'PageWeave CMS',
+                    'version' => pw_version(),
+                ],
             ]);
 
         case 'notifications/initialized':

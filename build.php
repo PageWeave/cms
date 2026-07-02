@@ -48,9 +48,8 @@ function pw_strip_php_head(string $content): string
     return ltrim($content);
 }
 
-function pw_banner(): string
+function pw_banner(string $version): string
 {
-    $version = trim((string) file_get_contents(__DIR__ . '/VERSION'));
     return <<<BANNER
 /*
  * ============================================================================
@@ -74,10 +73,18 @@ function pw_banner(): string
 BANNER;
 }
 
+$version = is_file(__DIR__ . '/VERSION')
+    ? trim((string) file_get_contents(__DIR__ . '/VERSION'))
+    : 'dev';
+
 $parts = [];
 $parts[] = "<?php\n";
 $parts[] = "declare(strict_types=1);\n\n";
-$parts[] = pw_banner();
+$parts[] = pw_banner($version);
+
+// Bake the implementation version (single source: VERSION) so the standalone
+// compiled file reports it without needing the VERSION file on the web server.
+$parts[] = "define('PW_VERSION', " . var_export($version, true) . ");\n\n";
 
 foreach (pw_build_files() as $relative) {
     $path = SRC_DIR . '/' . $relative;

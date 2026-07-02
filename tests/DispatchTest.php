@@ -17,6 +17,8 @@ final class DispatchTest extends PwTestCase
         $this->assertSame('2025-06-18', $resp['result']['protocolVersion']);
         $this->assertArrayHasKey('tools', (array) $resp['result']['capabilities']);
         $this->assertSame('PageWeave CMS', $resp['result']['serverInfo']['name']);
+        $this->assertSame('PageWeave CMS', $resp['result']['serverInfo']['title']);
+        $this->assertSame(pw_version(), $resp['result']['serverInfo']['version']);
     }
 
     public function test_ping_returns_empty_result(): void
