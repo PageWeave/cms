@@ -53,4 +53,13 @@ abstract class PwTestCase extends TestCase
     {
         return $this->tmp . '/webroot';
     }
+
+    protected function ctx(): array
+    {
+        return [
+            'cmsDir' => $this->cmsDir(),
+            'docRoot' => $this->webroot(),
+            'siteTitle' => 'Site',
+        ];
+    }
 }
