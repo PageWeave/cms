@@ -163,6 +163,7 @@ function pw_delete_page(string $base, string $slug): array
     if (!is_file($file)) {
         return ['ok' => false, 'error' => "page '" . pw_normalize_slug($slug) . "' not found"];
     }
+    // nosem: php.lang.security.unlink-use.unlink-use — path resolved via pw_slug_to_file after pw_validate_slug
     return unlink($file)
         ? ['ok' => true]
         : ['ok' => false, 'error' => 'failed to delete page'];

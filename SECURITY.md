@@ -73,7 +73,7 @@ Findings from the initial security audit (2026-07-02), all remediated. Each row
 links conceptually to the fixing commit.
 
 | # | Severity | Finding | Status |
-|---|----------|---------|--------|
+|---|---|----------|---------|--------|
 | 1 | High | Install page persisted the client `Host` header unvalidated → stored XSS + MCP-endpoint poisoning (`json_encode` does not escape `<>` by default, so both the endpoint `<code>` and the snippet `<pre>` were sinks). First requestor could poison `_cms/pages/index.html`. | Fixed `2e80e27` — `SITE_URL` config; `pw_resolve_host()` allowlist-validates `Host`; output `htmlspecialchars`'d; snippet uses `JSON_HEX_TAG\|AMP\|APOS\|QUOT`. |
 | 2 | Medium | Unauthenticated read path (`pw_get_page`/`pw_page_exists`) skipped `pw_validate_slug`; encoded traversal (`/..\%2fpartials\%2fheader`) escaped `pages/` and rendered any `.html` under `_cms`. Blocked by default Apache (`AllowEncodedSlashes Off`) but reachable on Apache `On`, nginx, LiteSpeed, PHP dev server. `.html` suffix limited it to HTML files. | Fixed `088c909` — slug validation added to both read functions; per OWASP, validation happens at the app layer. |
 | 3 | Low | Tool dispatch catch returned `$e->getMessage()` to MCP clients, leaking internal filesystem paths from exceptions. | Fixed `12cd9bf` — generic `"Tool error"` to client; detail `error_log`'d server-side. |
@@ -82,6 +82,7 @@ links conceptually to the fixing commit.
 | 6 | Info | No default security headers on served pages. | Mitigated `8dbd4e6` — HTML responses emit `nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`. Strict CSP/HSTS intentionally omitted (would break operator HTML + install-page inline styles). |
 | 7 | Info | Partial name unvalidated at the storage layer (safe due to tool callers hard-coding names). | Mitigated `8dbd4e6` — `pw_partial_file` allowlists `head`/`header`/`footer`. |
 | 8 | Info | `MCP_KEY` had no documented strength requirement. | Mitigated `8dbd4e6` — config + banner document ≥ 32 bytes with a generation snippet. |
+| 9 | Info | No automated static security analysis. | Mitigated — CI now runs Psalm (taint + static analysis) and Semgrep (OWASP/CWE/PHP rules + custom PageWeave rules) on every PR. |
 
 ### Notes for existing installs
 

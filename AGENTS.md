@@ -15,7 +15,7 @@ that users drop on a web server. PHP **8.3**, zero runtime Composer dependencies
 - **PHP 8.3** (pinned via `mise`; see `.mise.toml`). Never use syntax/features from 8.4+.
 - **No runtime dependencies.** The compiled `dist/index.php` must work with only the default
   extensions (`json`, `mbstring`, `pcre`). Do not introduce `require` of any vendor package into
-  runtime code. Composer is **dev-only** (PHPUnit 12, php-cs-fixer).
+  runtime code. Composer is **dev-only** (PHPUnit 12, php-cs-fixer, Psalm).
 - **Flat global functions, no namespace.** Keeps the concatenated single file trivially readable.
   Prefix function names to avoid collisions (e.g. `pw_*`).
 - **Pure-function core.** I/O-touching code (`$_SERVER`, `header()`, `echo`, `file_*`) belongs in
@@ -25,13 +25,17 @@ that users drop on a web server. PHP **8.3**, zero runtime Composer dependencies
 ## Setup commands
 
 ```bash
-mise install                 # install PHP 8.3 for the project
-composer install             # dev tooling only
-vendor/bin/phpunit           # run the test suite
-vendor/bin/php-cs-fixer fix  # fix style
-php build.php                # compile src/ → dist/index.php
-php -l dist/index.php        # syntax-check the build (always run after building)
-php -S localhost:8000 -t dist # local server for manual smoke testing
+mise install                        # install PHP 8.3 for the project
+composer install                    # dev tooling only
+vendor/bin/phpunit                  # run the test suite
+vendor/bin/php-cs-fixer fix         # fix style
+vendor/bin/psalm --no-cache         # static analysis + taint analysis
+php build.php                       # compile src/ → dist/index.php
+php -l dist/index.php               # syntax-check the build (always run after building)
+php -S localhost:8000 -t dist       # local server for manual smoke testing
+
+# Semgrep SAST (requires semgrep CLI or Docker; runs in CI on every PR)
+semgrep scan --config auto --config p/owasp-top-ten --config p/cwe-top-25 --config p/php --config .semgrep/pageweave.yml --error
 ```
 
 ## Testing instructions
@@ -42,6 +46,8 @@ php -S localhost:8000 -t dist # local server for manual smoke testing
   (use `tmpdir()` helpers / `tearDown` cleanup) — never touch the repo's real filesystem.
 - **Do not push if tests fail.** Fix until the whole suite is green before committing.
 - After **building**, always run `php -l dist/index.php`.
+- Run `vendor/bin/psalm --no-cache` after security-relevant changes; it performs taint analysis on `src/` and the built `dist/index.php`.
+- Run Semgrep before committing security-sensitive code (`composer security:semgrep` if installed locally, or via Docker per the command above).
 - Add or update tests for any code you change, even if not asked.
 
 ## Architecture (where things live)

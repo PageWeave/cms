@@ -10,14 +10,21 @@
         "ext-pcre": "*"
     },
     "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.0",
         "phpunit/phpunit": "^12.0",
-        "friendsofphp/php-cs-fixer": "^3.0"
+        "vimeo/psalm": "^6.16"
     },
     "scripts": {
         "test": "phpunit",
         "build": "php build.php",
         "fix": "php-cs-fixer fix",
-        "lint": "php -l dist/index.php"
+        "lint": "php -l dist/index.php",
+        "security:psalm": "psalm --no-cache",
+        "security:semgrep": "semgrep scan --config auto --config p/owasp-top-ten --config p/cwe-top-25 --config p/php --config .semgrep/pageweave.yml --error src build.php",
+        "security": [
+            "@security:psalm",
+            "@security:semgrep"
+        ]
     },
     "config": {
         "sort-packages": true

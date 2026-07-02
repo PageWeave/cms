@@ -1,0 +1,78 @@
+rules:
+  - id: pageweave-no-dynamic-include
+    languages:
+      - php
+    message: |
+      Dynamic include/require can execute arbitrary code. PageWeave deliberately never includes
+      stored content; keep it that way. Use a literal path or load data with file_get_contents().
+    severity: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: include $PATH;
+          - pattern: include_once $PATH;
+          - pattern: require $PATH;
+          - pattern: require_once $PATH;
+      - pattern-not: include "...";
+      - pattern-not: include_once "...";
+      - pattern-not: require "...";
+      - pattern-not: require_once "...";
+    metadata:
+      category: security
+      technology:
+        - php
+      references:
+        - https://github.com/PageWeave/cms/blob/main/SECURITY.md
+
+  - id: pageweave-echo-http-host
+    languages:
+      - php
+    message: |
+      $_SERVER['HTTP_HOST'] is attacker-controlled and must not be output without validation/escaping.
+      Use pw_resolve_host() or htmlspecialchars() before emitting it.
+    severity: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: echo $_SERVER['HTTP_HOST'];
+          - pattern: echo $HOST;
+          - pattern: print $_SERVER['HTTP_HOST'];
+          - pattern: print $HOST;
+      - pattern-inside: |
+          $HOST = $_SERVER['HTTP_HOST'];
+          ...
+    metadata:
+      category: security
+      technology:
+        - php
+      references:
+        - https://github.com/PageWeave/cms/blob/main/SECURITY.md
+
+  - id: pageweave-request-uri-file-path
+    languages:
+      - php
+    message: |
+      REQUEST_URI is attacker-controlled and must not be used directly as a filesystem path.
+      Pass it through pw_path_from_uri() and pw_validate_slug() / pw_slug_to_file() instead.
+    severity: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: file_get_contents($PATH, ...)
+          - pattern: file_put_contents($PATH, ...)
+          - pattern: file_exists($PATH)
+          - pattern: is_file($PATH)
+          - pattern: is_dir($PATH)
+          - pattern: mkdir($PATH, ...)
+          - pattern: unlink($PATH)
+          - pattern: rmdir($PATH)
+          - pattern: scandir($PATH)
+          - pattern: fopen($PATH, ...)
+      - pattern-either:
+          - pattern: $PATH = $_SERVER['REQUEST_URI']
+          - pattern: $PATH = $_SERVER['HTTP_HOST']
+          - pattern: $PATH = $_SERVER['PATH_INFO']
+          - pattern: $PATH = $_SERVER['SCRIPT_NAME']
+    metadata:
+      category: security
+      technology:
+        - php
+      references:
+        - https://github.com/PageWeave/cms/blob/main/SECURITY.md
