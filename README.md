@@ -136,6 +136,14 @@ tooling (PHPUnit 12, php-cs-fixer).
 
 ---
 
+## Security
+
+Found a vulnerability? Please report it **privately** to
+**security@pageweave.dev** (or via [GitHub Security
+Advisories](https://github.com/PageWeave/cms/security/advisories/new)) — do not
+open a public issue. See [SECURITY.md](./SECURITY.md) for the full policy,
+threat model, and audit history.
+
 ## License
 
 Copyright © 2026 PageWeave CMS contributors.
