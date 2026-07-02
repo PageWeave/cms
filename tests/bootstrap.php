@@ -12,3 +12,5 @@ foreach (glob(__DIR__ . '/../src/*.php') as $file) {
 foreach (glob(__DIR__ . '/../src/tools/*.php') as $file) {
     require_once $file;
 }
+
+require_once __DIR__ . '/PwTestCase.php';
