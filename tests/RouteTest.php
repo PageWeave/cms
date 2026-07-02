@@ -192,4 +192,33 @@ final class RouteTest extends PwTestCase
         $this->assertSame(200, $resp['status']);
         $this->assertStringContainsString('nested', $resp['body']);
     }
+
+    // ---- Tier 4: default security headers ---------------------------------
+
+    public function test_html_page_response_carries_security_headers(): void
+    {
+        pw_create_page($this->cmsDir(), 'about', '<p>hi</p>', null, null);
+        $this->markInstalled();
+        $resp = pw_route_get(['REQUEST_URI' => '/about'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $this->assertSame('nosniff', $resp['headers']['X-Content-Type-Options'] ?? null);
+        $this->assertSame('SAMEORIGIN', $resp['headers']['X-Frame-Options'] ?? null);
+        $this->assertSame('strict-origin-when-cross-origin', $resp['headers']['Referrer-Policy'] ?? null);
+    }
+
+    public function test_404_response_carries_security_headers(): void
+    {
+        $this->markInstalled();
+        $resp = pw_route_get(['REQUEST_URI' => '/missing'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $this->assertSame(404, $resp['status']);
+        $this->assertSame('nosniff', $resp['headers']['X-Content-Type-Options'] ?? null);
+        $this->assertSame('SAMEORIGIN', $resp['headers']['X-Frame-Options'] ?? null);
+    }
+
+    public function test_mcp_json_response_has_no_frame_options(): void
+    {
+        // Security headers target rendered HTML; JSON API responses need not set them.
+        $body = json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping']);
+        $resp = pw_route_mcp(['HTTP_AUTHORIZATION' => 'Bearer secret'], $body, $this->mcpKey(), $this->mcpCtx());
+        $this->assertArrayNotHasKey('X-Frame-Options', $resp['headers'] ?? []);
+    }
 }

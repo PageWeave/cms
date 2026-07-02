@@ -255,4 +255,32 @@ final class StorageTest extends PwTestCase
         $r = pw_apply_replacements('body', [['old_html' => '', 'new_html' => 'y']]);
         $this->assertFalse($r['ok']);
     }
+
+    // ---- Tier 4: partial-name allowlist (defense in depth) ----------------
+
+    public function test_partial_write_rejects_unknown_name(): void
+    {
+        pw_write_partial($this->cmsDir(), '../evil', '<x/>');
+        $this->assertFileDoesNotExist($this->cmsDir() . '/../evil.html');
+        $this->assertFileDoesNotExist($this->cmsDir() . '/partials/../evil.html');
+    }
+
+    public function test_partial_get_rejects_unknown_name(): void
+    {
+        @mkdir($this->cmsDir() . '/partials', 0775, true);
+        file_put_contents($this->cmsDir() . '/partials/header.html', '<h>H</h>');
+        // Only head/header/footer are allowed; anything else returns ''.
+        $this->assertSame('', pw_get_partial($this->cmsDir(), '../evil'));
+        $this->assertSame('', pw_get_partial($this->cmsDir(), 'menu'));
+        // Allowed name still reads the seeded content.
+        $this->assertSame('<h>H</h>', pw_get_partial($this->cmsDir(), 'header'));
+    }
+
+    public function test_partial_known_names_still_work(): void
+    {
+        foreach (['head', 'header', 'footer'] as $name) {
+            pw_write_partial($this->cmsDir(), $name, "<$name/>");
+            $this->assertSame("<$name/>", pw_get_partial($this->cmsDir(), $name));
+        }
+    }
 }

@@ -58,9 +58,14 @@ function pw_banner(string $version): string
  *  A self-hostable, single-file PHP CMS with a built-in MCP server.
  *
  *  QUICK START
- *    1. Set MCP_KEY below to a long random string (enables the /mcp endpoint).
- *    2. Upload THIS file as `index.php` to your web server's document root.
- *    3. Visit your domain — first run auto-configures routing and shows setup.
+ *    1. Set MCP_KEY below to a long random string (>= 32 chars) to enable the
+ *       /mcp endpoint. Generate one:
+ *         php -r 'echo bin2hex(random_bytes(32));'
+ *    2. (Recommended) Set SITE_URL to your canonical URL, e.g.
+ *       'https://example.com' — used for the install-page MCP endpoint instead
+ *       of trusting the client Host header.
+ *    3. Upload THIS file as `index.php` to your web server's document root.
+ *    4. Visit your domain — first run auto-configures routing and shows setup.
  *
  *  Page serving works even with MCP_KEY empty; MCP is disabled until you set it.
  *

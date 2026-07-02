@@ -13,7 +13,8 @@ declare(strict_types=1);
  */
 
 // Bearer token that MCP clients must send. Use a long random string.
-// Empty string => MCP disabled (site still serves).
+// Generate one with, e.g.:  php -r 'echo bin2hex(random_bytes(32));'
+// Use at least 32 characters. Empty string => MCP disabled (site still serves).
 const MCP_KEY = '';
 
 // Where your source code lives. Shown as the "Source" link (AGPL §13).

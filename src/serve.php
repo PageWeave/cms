@@ -15,6 +15,21 @@ function pw_response(int $status, string $contentType, string $body, array $head
     return ['status' => $status, 'contentType' => $contentType, 'body' => $body, 'headers' => $headers];
 }
 
+/**
+ * Baseline security headers for rendered HTML responses. Deliberately narrow:
+ * no HSTS (HTTPS-only, risky if misconfigured) and no strict CSP (would break
+ * operator-authored HTML and the install page's inline styles). The operator
+ * can add stronger headers via the head partial.
+ */
+function pw_security_headers(): array
+{
+    return [
+        'X-Content-Type-Options' => 'nosniff',
+        'X-Frame-Options' => 'SAMEORIGIN',
+        'Referrer-Policy' => 'strict-origin-when-cross-origin',
+    ];
+}
+
 function pw_path_from_uri(string $uri): string
 {
     $path = $uri;
@@ -75,7 +90,7 @@ function pw_route_get(
 
     $page = pw_get_page($cmsDir, $slug);
     if ($page === null) {
-        return pw_response(404, 'text/html; charset=utf-8', pw_not_found_html($slug, $siteTitle));
+        return pw_response(404, 'text/html; charset=utf-8', pw_not_found_html($slug, $siteTitle), pw_security_headers());
     }
-    return pw_response(200, 'text/html; charset=utf-8', pw_render_page($cmsDir, $page, $siteTitle));
+    return pw_response(200, 'text/html; charset=utf-8', pw_render_page($cmsDir, $page, $siteTitle), pw_security_headers());
 }

@@ -193,24 +193,36 @@ function pw_list_pages(string $base): array
 
 // ---- partials ------------------------------------------------------------
 
-function pw_partial_file(string $base, string $name): string
+/**
+ * Only head/header/footer may be read or written as partials. The tool layer
+ * already hard-codes these names, but validating here is defense in depth: a
+ * future caller must not be able to traverse out of partials/ via the name.
+ */
+function pw_partial_file(string $base, string $name): ?string
 {
+    if (!in_array($name, ['head', 'header', 'footer'], true)) {
+        return null;
+    }
     return $base . '/partials/' . $name . '.html';
 }
 
 function pw_get_partial(string $base, string $name): string
 {
     $file = pw_partial_file($base, $name);
-    return is_file($file) ? (string) file_get_contents($file) : '';
+    return $file !== null && is_file($file) ? (string) file_get_contents($file) : '';
 }
 
 function pw_write_partial(string $base, string $name, string $html): void
 {
+    $file = pw_partial_file($base, $name);
+    if ($file === null) {
+        return;
+    }
     $dir = $base . '/partials';
     if (!is_dir($dir)) {
         mkdir($dir, 0775, true);
     }
-    file_put_contents(pw_partial_file($base, $name), $html, LOCK_EX);
+    file_put_contents($file, $html, LOCK_EX);
 }
 
 // ---- assets --------------------------------------------------------------
