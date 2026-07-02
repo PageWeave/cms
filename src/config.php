@@ -18,7 +18,7 @@ const MCP_KEY = '';
 
 // Where your source code lives. Shown as the "Source" link (AGPL §13).
 // If you run a modified version, point this at your published source.
-const SOURCE_URL = 'https://github.com/pageweave/pageweave-cms';
+const SOURCE_URL = 'https://github.com/PageWeave/cms';
 
 // Fallback <title> for pages that do not set one.
 const SITE_TITLE = 'My Site';
