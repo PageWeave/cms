@@ -98,6 +98,83 @@ final class RouteTest extends PwTestCase
         $this->assertSame(200, $resp['status']);
     }
 
+    public function test_mcp_supported_protocol_version_accepted(): void
+    {
+        // Both the current version and the spec's backwards-compat fallback MUST be accepted.
+        foreach (['2025-06-18', '2025-03-26'] as $version) {
+            $body = json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping']);
+            $resp = pw_route_mcp(
+                ['HTTP_AUTHORIZATION' => 'Bearer secret', 'HTTP_MCP_PROTOCOL_VERSION' => $version],
+                $body,
+                $this->mcpKey(),
+                $this->mcpCtx()
+            );
+            $this->assertSame(200, $resp['status'], "version $version should be accepted");
+        }
+    }
+
+    public function test_mcp_unsupported_protocol_version_returns_400(): void
+    {
+        $body = json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping']);
+        $resp = pw_route_mcp(
+            ['HTTP_AUTHORIZATION' => 'Bearer secret', 'HTTP_MCP_PROTOCOL_VERSION' => '1999-01-01'],
+            $body,
+            $this->mcpKey(),
+            $this->mcpCtx()
+        );
+        $this->assertSame(400, $resp['status']);
+        $json = json_decode($resp['body'], true);
+        $this->assertSame(-32600, $json['error']['code']);
+    }
+
+    // ---- JSON-RPC batch edge cases (JSON-RPC 2.0 §6) ---------------------
+
+    public function test_mcp_empty_batch_returns_single_invalid_request(): void
+    {
+        // §6: empty array is not "an Array with at least one value" → single
+        // Invalid Request object, never an empty array.
+        $resp = pw_route_mcp(
+            ['HTTP_AUTHORIZATION' => 'Bearer secret'],
+            '[]',
+            $this->mcpKey(),
+            $this->mcpCtx()
+        );
+        $this->assertSame(400, $resp['status']);
+        $json = json_decode($resp['body'], true);
+        $this->assertIsArray($json);
+        $this->assertArrayNotHasKey(0, $json, 'must not be an array of errors');
+        $this->assertSame('2.0', $json['jsonrpc']);
+        $this->assertSame(-32600, $json['error']['code']);
+        $this->assertNull($json['id']);
+    }
+
+    public function test_mcp_all_notification_batch_returns_202_empty(): void
+    {
+        // §6: no surviving responses (all notifications) → MUST NOT return an
+        // empty array; Streamable HTTP: notification input → 202 with no body.
+        $body = json_encode([
+            ['jsonrpc' => '2.0', 'method' => 'notifications/initialized'],
+            ['jsonrpc' => '2.0', 'method' => 'something'],
+        ]);
+        $resp = pw_route_mcp(['HTTP_AUTHORIZATION' => 'Bearer secret'], $body, $this->mcpKey(), $this->mcpCtx());
+        $this->assertSame(202, $resp['status']);
+        $this->assertSame('', $resp['body']);
+    }
+
+    public function test_mcp_mixed_batch_returns_only_request_responses(): void
+    {
+        // A notification in a mixed batch is suppressed; requests get responses.
+        $body = json_encode([
+            ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping'],
+            ['jsonrpc' => '2.0', 'method' => 'notifications/initialized'],
+            ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'ping'],
+        ]);
+        $resp = pw_route_mcp(['HTTP_AUTHORIZATION' => 'Bearer secret'], $body, $this->mcpKey(), $this->mcpCtx());
+        $this->assertSame(200, $resp['status']);
+        $arr = json_decode($resp['body'], true);
+        $this->assertSame([1, 2], array_column($arr, 'id'));
+    }
+
     // ---- GET route (pw_route_get) ----------------------------------------
 
     public function test_get_first_run_runs_setup_and_serves_install_page(): void

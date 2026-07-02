@@ -17,6 +17,13 @@ declare(strict_types=1);
 const MCP_PROTOCOL_VERSION = '2025-06-18';
 
 /**
+ * Protocol versions this server accepts via the MCP-Protocol-Version header.
+ * Includes 2025-03-26 (the spec's stated backwards-compat fallback) so older
+ * clients are not rejected. Any other value → 400 Bad Request.
+ */
+const MCP_SUPPORTED_VERSIONS = ['2025-06-18', '2025-03-26'];
+
+/**
  * Extract a bearer token from an Authorization header value.
  * Returns null if the header is missing or not a "Bearer <token>" pair.
  */
@@ -69,6 +76,12 @@ function pw_dispatch_jsonrpc(array $request, array $ctx): ?array
     $isNotification = !array_key_exists('id', $request);
     $id = $request['id'] ?? null;
     $method = $request['method'];
+
+    // JSON-RPC §4.2: params, if present, MUST be a Structured value (Array or
+    // Object). Reject primitives; treat explicit null like an omitted params.
+    if (array_key_exists('params', $request) && $request['params'] !== null && !is_array($request['params'])) {
+        return pw_jsonrpc_invalid_params($id, 'params must be an object or array');
+    }
     $params = isset($request['params']) && is_array($request['params']) ? $request['params'] : [];
 
     switch ($method) {
@@ -129,6 +142,16 @@ function pw_route_mcp(array $server, string $body, string $mcpKey, array $ctx): 
         return pw_response(401, 'application/json', json_encode(pw_jsonrpc_error(null, -32001, 'Unauthorized')));
     }
 
+    // Streamable HTTP §Protocol Version Header: an invalid/unsupported
+    // MCP-Protocol-Version MUST yield 400. Absent header is allowed (stateless
+    // server; initialize carries the negotiated version).
+    $protoVersion = $server['HTTP_MCP_PROTOCOL_VERSION'] ?? null;
+    if ($protoVersion !== null && !in_array($protoVersion, MCP_SUPPORTED_VERSIONS, true)) {
+        return pw_response(400, 'application/json', json_encode(
+            pw_jsonrpc_invalid_request(null, 'Unsupported MCP protocol version')
+        ));
+    }
+
     $decoded = json_decode($body, true);
     if ($decoded === null && trim($body) !== '') {
         return pw_response(400, 'application/json', json_encode(pw_jsonrpc_parse_error()));
@@ -136,6 +159,11 @@ function pw_route_mcp(array $server, string $body, string $mcpKey, array $ctx): 
 
     // JSON-RPC batch request.
     if (is_array($decoded) && array_is_list($decoded)) {
+        // §6: an empty array is not "an Array with at least one value" → MUST
+        // return a single Invalid Request object, never an empty array.
+        if ($decoded === []) {
+            return pw_response(400, 'application/json', json_encode(pw_jsonrpc_invalid_request()));
+        }
         $responses = [];
         foreach ($decoded as $item) {
             if (!is_array($item)) {
@@ -146,6 +174,12 @@ function pw_route_mcp(array $server, string $body, string $mcpKey, array $ctx): 
             if ($resp !== null) {
                 $responses[] = $resp;
             }
+        }
+        // §6: if no responses survive (e.g. all-notifications batch) the server
+        // MUST NOT return an empty array. Streamable HTTP maps notification
+        // input to 202 Accepted with no body.
+        if ($responses === []) {
+            return pw_response(202, '', '');
         }
         return pw_response(200, 'application/json', json_encode($responses));
     }

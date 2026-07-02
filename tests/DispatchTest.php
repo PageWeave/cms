@@ -45,6 +45,27 @@ final class DispatchTest extends PwTestCase
         $this->assertSame(-32600, $resp['error']['code']);
     }
 
+    public function test_scalar_params_rejected_as_invalid_params(): void
+    {
+        // JSON-RPC §4.2: params MUST be an object or array, never a primitive.
+        $resp = $this->dispatch([
+            'jsonrpc' => '2.0', 'id' => 10, 'method' => 'ping',
+            'params' => 42,
+        ]);
+        $this->assertSame(-32602, $resp['error']['code']);
+    }
+
+    public function test_null_params_accepted_like_omitted(): void
+    {
+        // Lenient: explicit params:null behaves like an omitted params.
+        $resp = $this->dispatch([
+            'jsonrpc' => '2.0', 'id' => 11, 'method' => 'ping',
+            'params' => null,
+        ]);
+        $this->assertSame(11, $resp['id']);
+        $this->assertInstanceOf(\stdClass::class, $resp['result']);
+    }
+
     public function test_tools_list_includes_registered_tools(): void
     {
         $resp = $this->dispatch(['jsonrpc' => '2.0', 'id' => 5, 'method' => 'tools/list']);
