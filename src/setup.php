@@ -43,6 +43,12 @@ function pw_htaccess_content(): string
     RewriteRule ^ index.php [L]
 </IfModule>
 
+# Defense-in-depth: block any .env file (config.env lives in _cms/, already
+# denied above, but this catches a misplaced config file in the doc root).
+<FilesMatch "\.env$">
+    Require all denied
+</FilesMatch>
+
 Options -Indexes
 HTACCESS;
 }
@@ -55,6 +61,13 @@ function pw_nginx_content(): string
 
 # Protect the CMS data directory.
 location ^~ /_cms/ {
+    deny all;
+    return 403;
+}
+
+# Defense-in-depth: never serve the config file (already covered by the _cms
+# deny above, but make the protection explicit).
+location ~ /config\.env$ {
     deny all;
     return 403;
 }
@@ -115,8 +128,8 @@ function pw_install_page_html(string $host, string $mcpPath, bool $mcpEnabled, s
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
     $notice = $mcpEnabled
-        ? '<p style="color:#16a34a;font-weight:600;">✅ MCP is enabled.</p>'
-        : '<p style="color:#dc2626;font-weight:600;">⚠️ MCP is disabled. Set <code>MCP_KEY</code> at the top of <code>index.php</code> and re-upload to enable it.</p>';
+        ? '<p style="color:#16a34a;font-weight:600;">✅ MCP is enabled. Your key is in <code>_cms/config.env</code>.</p>'
+        : '<p style="color:#dc2626;font-weight:600;">⚠️ MCP is disabled. Set <code>MCP_KEY</code> in <code>_cms/config.env</code>.</p>';
 
     return <<<HTML
 <div style="max-width:760px;margin:48px auto;font-family:system-ui,Segoe UI,sans-serif;color:#0f172a;line-height:1.6;">
@@ -150,9 +163,18 @@ function pw_is_installed(string $cmsDir): bool
 }
 
 /**
- * Run first-time setup. Creates the _cms tree, an editable install homepage,
- * the routing config appropriate to the detected server, and the .installed
- * marker. Returns what was written. Never clobbers an existing homepage.
+ * Generate a fresh 64-hex-char MCP bearer key (32 bytes of entropy).
+ */
+function pw_generate_mcp_key(): string
+{
+    return bin2hex(random_bytes(32));
+}
+
+/**
+ * Run first-time setup. Creates the _cms tree, writes the operator config
+ * (_cms/config.env with a generated MCP_KEY — never clobbered), an editable
+ * install homepage, the routing config for the detected server, and the
+ * .installed marker. Returns what was written plus the active MCP key.
  */
 function pw_run_setup(
     string $docRoot,
@@ -160,11 +182,10 @@ function pw_run_setup(
     string $serverSoftware,
     string $host,
     string $mcpPath,
-    bool $mcpEnabled,
-    string $siteTitle,
-    string $sourceUrl,
     string $scheme = 'https'
 ): array {
+    $defaults = pw_config_defaults();
+
     @mkdir($cmsDir . '/partials', 0775, true);
     @mkdir($cmsDir . '/pages', 0775, true);
     @mkdir($docRoot, 0775, true);
@@ -172,12 +193,27 @@ function pw_run_setup(
     // Protect the _cms directory from direct access (Apache/LiteSpeed).
     file_put_contents($cmsDir . '/.htaccess', pw_cms_deny_content(), LOCK_EX);
 
-    // Editable install homepage — only if none exists yet.
+    // Operator config — create once with a generated key; never overwrite.
+    $configEnv = $cmsDir . '/' . PW_CONFIG_FILE;
+    if (!is_file($configEnv)) {
+        $mcpKey = pw_generate_mcp_key();
+        file_put_contents(
+            $configEnv,
+            pw_config_env_content($mcpKey, $defaults['sourceUrl'], $defaults['siteTitle'], $defaults['siteUrl']),
+            LOCK_EX
+        );
+    } else {
+        $existing = pw_load_env_file($configEnv);
+        $mcpKey = $existing['MCP_KEY'] ?? '';
+    }
+
+    // Editable install homepage — only if none exists yet. A key was just
+    // generated (or already present), so MCP is enabled.
     $indexFile = $cmsDir . '/pages/index.html';
     if (!is_file($indexFile)) {
         file_put_contents(
             $indexFile,
-            pw_install_page_html($host, $mcpPath, $mcpEnabled, $sourceUrl, $scheme),
+            pw_install_page_html($host, $mcpPath, $mcpKey !== '', $defaults['sourceUrl'], $scheme),
             LOCK_EX
         );
     }
@@ -199,5 +235,6 @@ function pw_run_setup(
         'server' => $server,
         'wroteHtaccess' => $wroteHtaccess,
         'wroteNginx' => $wroteNginx,
+        'mcpKey' => $mcpKey,
     ];
 }

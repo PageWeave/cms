@@ -8,6 +8,14 @@ declare(strict_types=1);
 
 const PW_VERSION_FILE = __DIR__ . '/../VERSION';
 
+/**
+ * Location of the CMS data directory (pages, partials, config.env). Hardcoded
+ * relative to the running file — in the compiled single file this resolves to
+ * the document root's _cms/, next to index.php. Not user-configurable; all
+ * operator settings live in _cms/config.env instead.
+ */
+const PW_CMS_DIR = __DIR__ . '/_cms';
+
 // VERSION is the single source of truth for the implementation version.
 // In dev/tests this reads the repo's VERSION file. The compiled single file
 // pre-defines PW_VERSION with the literal (baked by build.php), so this guard

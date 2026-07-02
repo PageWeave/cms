@@ -62,23 +62,10 @@ function pw_not_found_html(string $slug, string $siteTitle): string
 
 function pw_route_get(
     array $server,
-    string $docRoot,
     string $cmsDir,
     string $siteTitle,
-    string $sourceUrl,
-    string $mcpKey,
-    string $siteUrl = ''
+    string $sourceUrl
 ): array {
-    if (!pw_is_installed($cmsDir)) {
-        $httpHost = $server['HTTP_HOST'] ?? '';
-        $scheme = ($siteUrl !== '' && is_string(parse_url($siteUrl, PHP_URL_SCHEME)))
-            ? (string) parse_url($siteUrl, PHP_URL_SCHEME)
-            : 'https';
-        $host = pw_resolve_host($siteUrl, $httpHost);
-        $software = $server['SERVER_SOFTWARE'] ?? '';
-        pw_run_setup($docRoot, $cmsDir, $software, $host, '/mcp', $mcpKey !== '', $siteTitle, $sourceUrl, $scheme);
-    }
-
     $slug = pw_path_from_uri($server['REQUEST_URI'] ?? '/');
 
     if ($slug === 'mcp') {

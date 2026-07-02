@@ -177,22 +177,135 @@ final class RouteTest extends PwTestCase
 
     // ---- GET route (pw_route_get) ----------------------------------------
 
-    public function test_get_first_run_runs_setup_and_serves_install_page(): void
+    public function test_router_first_run_runs_setup_and_serves_install_page(): void
     {
-        $resp = pw_route_get(
-            ['REQUEST_URI' => '/', 'HTTP_HOST' => 'example.com', 'SERVER_SOFTWARE' => 'Apache/2.4.41'],
+        $resp = pw_router_dispatch(
+            ['REQUEST_URI' => '/', 'REQUEST_METHOD' => 'GET', 'HTTP_HOST' => 'example.com', 'SERVER_SOFTWARE' => 'Apache/2.4.41'],
+            '',
             $this->webroot(),
-            $this->cmsDir(),
-            'Site',
-            'https://src',
-            'secret'
+            $this->cmsDir()
         );
         $this->assertSame(200, $resp['status']);
         $this->assertStringContainsString('text/html', $resp['contentType']);
         $this->assertStringContainsString('opencode.ai/docs/mcp-servers', $resp['body']);
-        // setup happened
+        // first-run setup happened, and config.env was created
         $this->assertTrue(is_file($this->cmsDir() . '/.installed'));
         $this->assertTrue(is_file($this->cmsDir() . '/pages/index.html'));
+        $this->assertTrue(is_file($this->cmsDir() . '/config.env'));
+    }
+
+    public function test_router_first_run_config_env_has_valid_generated_key(): void
+    {
+        pw_router_dispatch(
+            ['REQUEST_URI' => '/', 'REQUEST_METHOD' => 'GET', 'HTTP_HOST' => 'example.com', 'SERVER_SOFTWARE' => 'Apache/2.4.41'],
+            '',
+            $this->webroot(),
+            $this->cmsDir()
+        );
+        $env = pw_parse_env((string) file_get_contents($this->cmsDir() . '/config.env'));
+        $this->assertSame(64, strlen($env['MCP_KEY']));
+        $this->assertTrue(ctype_xdigit($env['MCP_KEY']));
+    }
+
+    public function test_router_mcp_auth_uses_config_env_key(): void
+    {
+        // Installed site with a known key in config.env.
+        $this->markInstalled();
+        file_put_contents($this->cmsDir() . '/config.env', "MCP_KEY=KNOWNKEY\n");
+        $body = json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping']);
+
+        $ok = pw_router_dispatch(
+            ['REQUEST_URI' => '/mcp', 'REQUEST_METHOD' => 'POST', 'HTTP_AUTHORIZATION' => 'Bearer KNOWNKEY'],
+            $body,
+            $this->webroot(),
+            $this->cmsDir()
+        );
+        $this->assertSame(200, $ok['status']);
+
+        $bad = pw_router_dispatch(
+            ['REQUEST_URI' => '/mcp', 'REQUEST_METHOD' => 'POST', 'HTTP_AUTHORIZATION' => 'Bearer WRONG'],
+            $body,
+            $this->webroot(),
+            $this->cmsDir()
+        );
+        $this->assertSame(401, $bad['status']);
+    }
+
+    public function test_router_replacing_index_does_not_lose_config(): void
+    {
+        // An "update" reuses the existing config.env (setup does not re-run).
+        $this->markInstalled();
+        file_put_contents($this->cmsDir() . '/config.env', "MCP_KEY=MYSECRET\nSITE_TITLE=Mine\n");
+        $body = json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping']);
+
+        $resp = pw_router_dispatch(
+            ['REQUEST_URI' => '/mcp', 'REQUEST_METHOD' => 'POST', 'HTTP_AUTHORIZATION' => 'Bearer MYSECRET'],
+            $body,
+            $this->webroot(),
+            $this->cmsDir()
+        );
+        $this->assertSame(200, $resp['status']);
+        $this->assertStringContainsString('MYSECRET', (string) file_get_contents($this->cmsDir() . '/config.env'));
+    }
+
+    // ---- first-run scheme derivation -------------------------------------
+
+    public function test_router_first_run_scheme_https_when_https_on(): void
+    {
+        pw_router_dispatch(
+            ['REQUEST_URI' => '/', 'REQUEST_METHOD' => 'GET', 'HTTP_HOST' => 'example.com', 'SERVER_SOFTWARE' => 'Apache/2.4.41', 'HTTPS' => 'on'],
+            '',
+            $this->webroot(),
+            $this->cmsDir()
+        );
+        $page = (string) file_get_contents($this->cmsDir() . '/pages/index.html');
+        $this->assertStringContainsString('https://example.com/mcp', $page);
+    }
+
+    public function test_router_first_run_scheme_http_when_https_off(): void
+    {
+        pw_router_dispatch(
+            ['REQUEST_URI' => '/', 'REQUEST_METHOD' => 'GET', 'HTTP_HOST' => 'example.com', 'SERVER_SOFTWARE' => 'Apache/2.4.41', 'HTTPS' => 'off'],
+            '',
+            $this->webroot(),
+            $this->cmsDir()
+        );
+        $page = (string) file_get_contents($this->cmsDir() . '/pages/index.html');
+        $this->assertStringContainsString('http://example.com/mcp', $page);
+        $this->assertStringNotContainsString('https://example.com/mcp', $page);
+    }
+
+    public function test_router_first_run_scheme_defaults_to_https_when_absent(): void
+    {
+        // Absent HTTPS var (e.g. behind a TLS-terminating proxy) must NOT render
+        // a misleading http:// endpoint — default to https.
+        pw_router_dispatch(
+            ['REQUEST_URI' => '/', 'REQUEST_METHOD' => 'GET', 'HTTP_HOST' => 'example.com', 'SERVER_SOFTWARE' => 'Apache/2.4.41'],
+            '',
+            $this->webroot(),
+            $this->cmsDir()
+        );
+        $page = (string) file_get_contents($this->cmsDir() . '/pages/index.html');
+        $this->assertStringContainsString('https://example.com/mcp', $page);
+    }
+
+    // ---- malformed config.env tolerance at the router level --------------
+
+    public function test_router_tolerates_malformed_config_env_lines(): void
+    {
+        $this->markInstalled();
+        file_put_contents(
+            $this->cmsDir() . '/config.env',
+            "this line is broken\nMCP_KEY=GOODKEY\n# a comment\n=NOKEY\nSITE_TITLE=Still Works\n"
+        );
+        $body = json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping']);
+        $resp = pw_router_dispatch(
+            ['REQUEST_URI' => '/mcp', 'REQUEST_METHOD' => 'POST', 'HTTP_AUTHORIZATION' => 'Bearer GOODKEY'],
+            $body,
+            $this->webroot(),
+            $this->cmsDir()
+        );
+        $this->assertSame(200, $resp['status']);
     }
 
     public function test_get_serves_existing_page(): void
@@ -202,7 +315,7 @@ final class RouteTest extends PwTestCase
         // mark installed so setup doesn't run
         $this->markInstalled();
 
-        $resp = pw_route_get(['REQUEST_URI' => '/about'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/about'], $this->cmsDir(), 'Site', 'https://src');
         $this->assertSame(200, $resp['status']);
         $this->assertStringContainsString('<p>hi</p>', $resp['body']);
         $this->assertStringContainsString('<title>About</title>', $resp['body']);
@@ -212,7 +325,7 @@ final class RouteTest extends PwTestCase
     public function test_get_missing_page_is_404(): void
     {
         $this->markInstalled();
-        $resp = pw_route_get(['REQUEST_URI' => '/nope'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/nope'], $this->cmsDir(), 'Site', 'https://src');
         $this->assertSame(404, $resp['status']);
     }
 
@@ -220,7 +333,7 @@ final class RouteTest extends PwTestCase
     {
         pw_create_page($this->cmsDir(), 'index', '<h1>home</h1>', 'Home', null);
         $this->markInstalled();
-        $resp = pw_route_get(['REQUEST_URI' => '/'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/'], $this->cmsDir(), 'Site', 'https://src');
         $this->assertSame(200, $resp['status']);
         $this->assertStringContainsString('<h1>home</h1>', $resp['body']);
     }
@@ -229,7 +342,7 @@ final class RouteTest extends PwTestCase
     {
         // A browser/curl GET (no SSE Accept) keeps the human-friendly info page.
         $this->markInstalled();
-        $resp = pw_route_get(['REQUEST_URI' => '/mcp'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/mcp'], $this->cmsDir(), 'Site', 'https://src');
         $this->assertSame(200, $resp['status']);
         $this->assertStringContainsString('MCP', $resp['body']);
     }
@@ -242,11 +355,9 @@ final class RouteTest extends PwTestCase
         $this->markInstalled();
         $resp = pw_route_get(
             ['REQUEST_URI' => '/mcp', 'HTTP_ACCEPT' => 'text/event-stream'],
-            $this->webroot(),
             $this->cmsDir(),
             'Site',
-            'https://src',
-            'secret'
+            'https://src'
         );
         $this->assertSame(405, $resp['status']);
         $this->assertSame('POST', $resp['headers']['Allow'] ?? null);
@@ -258,11 +369,9 @@ final class RouteTest extends PwTestCase
         $this->markInstalled();
         $resp = pw_route_get(
             ['REQUEST_URI' => '/mcp', 'HTTP_ACCEPT' => 'application/json, text/event-stream'],
-            $this->webroot(),
             $this->cmsDir(),
             'Site',
-            'https://src',
-            'secret'
+            'https://src'
         );
         $this->assertSame(405, $resp['status']);
     }
@@ -270,7 +379,7 @@ final class RouteTest extends PwTestCase
     public function test_get_source_redirects(): void
     {
         $this->markInstalled();
-        $resp = pw_route_get(['REQUEST_URI' => '/__source'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src.example', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/__source'], $this->cmsDir(), 'Site', 'https://src.example');
         $this->assertSame(302, $resp['status']);
         $this->assertSame('https://src.example', $resp['headers']['Location'] ?? null);
     }
@@ -279,7 +388,7 @@ final class RouteTest extends PwTestCase
     {
         pw_create_page($this->cmsDir(), 'about', 'body', null, null);
         $this->markInstalled();
-        $resp = pw_route_get(['REQUEST_URI' => '/index.php/about'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/index.php/about'], $this->cmsDir(), 'Site', 'https://src');
         $this->assertSame(200, $resp['status']);
     }
 
@@ -290,7 +399,7 @@ final class RouteTest extends PwTestCase
         @mkdir($this->cmsDir() . '/pages', 0775, true);
         pw_write_partial($this->cmsDir(), 'header', '<h>SECRET</h>');
         $this->markInstalled();
-        $resp = pw_route_get(['REQUEST_URI' => '/..%2fpartials%2fheader'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/..%2fpartials%2fheader'], $this->cmsDir(), 'Site', 'https://src');
         $this->assertSame(404, $resp['status']);
         $this->assertStringNotContainsString('SECRET', $resp['body']);
     }
@@ -299,7 +408,7 @@ final class RouteTest extends PwTestCase
     {
         pw_create_page($this->cmsDir(), 'blog/post-1', '<p>nested</p>', null, null);
         $this->markInstalled();
-        $resp = pw_route_get(['REQUEST_URI' => '/blog/post-1'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/blog/post-1'], $this->cmsDir(), 'Site', 'https://src');
         $this->assertSame(200, $resp['status']);
         $this->assertStringContainsString('nested', $resp['body']);
     }
@@ -310,7 +419,7 @@ final class RouteTest extends PwTestCase
     {
         pw_create_page($this->cmsDir(), 'about', '<p>hi</p>', null, null);
         $this->markInstalled();
-        $resp = pw_route_get(['REQUEST_URI' => '/about'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/about'], $this->cmsDir(), 'Site', 'https://src');
         $this->assertSame('nosniff', $resp['headers']['X-Content-Type-Options'] ?? null);
         $this->assertSame('SAMEORIGIN', $resp['headers']['X-Frame-Options'] ?? null);
         $this->assertSame('strict-origin-when-cross-origin', $resp['headers']['Referrer-Policy'] ?? null);
@@ -319,7 +428,7 @@ final class RouteTest extends PwTestCase
     public function test_404_response_carries_security_headers(): void
     {
         $this->markInstalled();
-        $resp = pw_route_get(['REQUEST_URI' => '/missing'], $this->webroot(), $this->cmsDir(), 'Site', 'https://src', 'secret');
+        $resp = pw_route_get(['REQUEST_URI' => '/missing'], $this->cmsDir(), 'Site', 'https://src');
         $this->assertSame(404, $resp['status']);
         $this->assertSame('nosniff', $resp['headers']['X-Content-Type-Options'] ?? null);
         $this->assertSame('SAMEORIGIN', $resp['headers']['X-Frame-Options'] ?? null);

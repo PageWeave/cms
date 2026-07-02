@@ -33,21 +33,21 @@ no database, no runtime dependencies, no build step required to use it.
 
 1. **Get the file.** Download the latest `index.php` from [Releases](../../releases), or build it
    yourself (see [Development](#development)).
-2. **Edit the top of the file** and set `MCP_KEY` to a long random secret:
-   ```php
-   const MCP_KEY = 'change-me-to-a-long-random-string';
-   ```
-3. **(Production) Set `SITE_URL`** to your canonical URL so the install page stops trusting the
-   client-controlled `Host` header:
-   ```php
-   const SITE_URL = 'https://example.com';
-   ```
-4. **Upload it** to your web server's document root **as `index.php`**.
-5. **Visit your domain.** On first load the CMS auto-detects your server (Apache/LiteSpeed/nginx),
-   writes the routing config, scaffolds `_cms/`, and shows an **"Installation successful"** page
-   with your MCP endpoint URL and agent setup instructions.
+2. **Upload it** to your web server's document root **as `index.php`**. No editing required.
+3. **Visit your domain.** On first load the CMS auto-detects your server (Apache/LiteSpeed/nginx),
+   writes the routing config, scaffolds `_cms/`, generates a random MCP key into `_cms/config.env`,
+   and shows an **"Installation successful"** page with your MCP endpoint URL and agent setup
+   instructions.
+4. **Open `_cms/config.env`** to view your generated MCP key (and tweak settings like site title).
 
-That's it. Page serving works even if `MCP_KEY` is unset; MCP simply stays disabled until you set it.
+That's it. Page serving works out of the box; MCP is ready immediately (a key is generated on first
+run). To change settings later — including the MCP key — edit `_cms/config.env`.
+
+### Updating the CMS
+
+To upgrade, just **replace `index.php`** with the new version. Your `_cms/` data and
+`_cms/config.env` are preserved automatically — nothing to reconfigure. `index.php` is pure code;
+all your settings live in `_cms/config.env`.
 
 ### Web server notes
 
@@ -83,17 +83,22 @@ Then prompt: *"Use pageweave-cms to create a homepage."* Other MCP-compatible cl
 
 ---
 
-## Configuration constants
+## Configuration
 
-Edit these at the top of `index.php`:
+All settings live in **`_cms/config.env`** — a simple `KEY=VALUE` file, auto-created on first run
+with a generated MCP key. `index.php` is pure code (edit it only to upgrade); to change a value,
+edit `_cms/config.env` and reload — no restart needed.
 
-| Constant | Purpose | Default |
+| Key | Purpose | Default |
 |---|---|---|
-| `MCP_KEY` | Bearer token for `/mcp`. Empty ⇒ MCP disabled (site still serves). | `''` |
+| `MCP_KEY` | Bearer token for `/mcp`. Auto-generated on first run. Empty ⇒ MCP disabled (site still serves). | generated (64 hex chars) |
 | `SITE_URL` | Canonical base URL (e.g. `https://example.com`). Used for the install-page MCP endpoint instead of the `Host` header. **Strongly recommended on production** to avoid trusting a client-controlled header. | `''` |
 | `SOURCE_URL` | Where your source lives (AGPL §13 "Source" link). | upstream repo |
-| `SITE_TITLE` | Fallback `<title>` for pages without one. | `'My Site'` |
-| `CMS_DIR` | Location of the `_cms/` data directory. | `<docroot>/_cms` |
+| `SITE_TITLE` | Fallback `<title>` for pages without one. | `My Site` |
+
+The `_cms/` data directory is fixed at `<docroot>/_cms`. It is protected from direct web access by
+generated `.htaccess`/nginx rules, so `_cms/config.env` (which holds your MCP key) is never served
+over HTTP.
 
 ---
 
@@ -101,6 +106,7 @@ Edit these at the top of `index.php`:
 
 ```
 _cms/
+├── config.env                            # your settings: MCP key, site title, source URL, …
 ├── partials/{head,header,footer}.html   # composed around every page
 └── pages/<slug>.html                     # page body + optional frontmatter
 assets/                                   # public static files you add (images, etc.)

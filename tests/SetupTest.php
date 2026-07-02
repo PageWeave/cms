@@ -58,12 +58,13 @@ final class SetupTest extends PwTestCase
         $this->assertStringContainsString('YOUR_MCP_KEY', $html);
     }
 
-    public function test_install_page_warns_when_mcp_disabled(): void
+    public function test_install_page_points_at_config_env(): void
     {
         $disabled = pw_install_page_html('example.com', '/mcp', false, 'https://example/src');
         $enabled = pw_install_page_html('example.com', '/mcp', true, 'https://example/src');
-        $this->assertStringContainsString('MCP_KEY', $disabled);
-        $this->assertStringNotContainsString('MCP disabled', $enabled);
+        $this->assertStringContainsString('_cms/config.env', $disabled);
+        $this->assertStringContainsString('_cms/config.env', $enabled);
+        $this->assertStringNotContainsString('disabled', $enabled);
     }
 
     // ---- run_setup --------------------------------------------------------
@@ -72,7 +73,7 @@ final class SetupTest extends PwTestCase
     {
         $docRoot = $this->webroot();
         $cms = $this->cmsDir();
-        $res = pw_run_setup($docRoot, $cms, 'Apache/2.4.41', 'example.com', '/mcp', true, 'Site', 'https://src');
+        $res = pw_run_setup($docRoot, $cms, 'Apache/2.4.41', 'example.com', '/mcp');
 
         $this->assertSame('apache', $res['server']);
         $this->assertTrue($res['wroteHtaccess']);
@@ -85,13 +86,19 @@ final class SetupTest extends PwTestCase
         $this->assertTrue(is_file($cms . '/pages/index.html'));
         $this->assertTrue(is_file($docRoot . '/.htaccess'));
         $this->assertSame('Require all denied', trim(file_get_contents($cms . '/.htaccess')));
+
+        // config.env is written with a freshly generated 64-hex MCP_KEY.
+        $this->assertTrue(is_file($cms . '/config.env'));
+        $env = pw_parse_env((string) file_get_contents($cms . '/config.env'));
+        $this->assertTrue(ctype_xdigit($env['MCP_KEY']));
+        $this->assertSame(64, strlen($env['MCP_KEY']));
     }
 
     public function test_run_setup_nginx_writes_nginx_conf(): void
     {
         $docRoot = $this->webroot();
         $cms = $this->cmsDir();
-        $res = pw_run_setup($docRoot, $cms, 'nginx/1.18', 'example.com', '/mcp', true, 'Site', 'https://src');
+        $res = pw_run_setup($docRoot, $cms, 'nginx/1.18', 'example.com', '/mcp');
         $this->assertSame('nginx', $res['server']);
         $this->assertFalse($res['wroteHtaccess']);
         $this->assertTrue($res['wroteNginx']);
@@ -146,16 +153,40 @@ final class SetupTest extends PwTestCase
         $this->assertStringNotContainsString('https://example.com/mcp', $html);
     }
 
-    public function test_run_setup_idempotent_does_not_clobber_existing_pages(): void
+    public function test_run_setup_idempotent_does_not_clobber_existing_data(): void
     {
         $docRoot = $this->webroot();
         $cms = $this->cmsDir();
         mkdir($cms . '/pages', 0775, true);
         file_put_contents($cms . '/pages/index.html', 'MY HOMEPAGE');
+        file_put_contents($cms . '/config.env', "MCP_KEY=MYKEY\n");
 
-        pw_run_setup($docRoot, $cms, 'Apache/2.4.41', 'h', '/mcp', true, 'Site', 'https://src');
+        pw_run_setup($docRoot, $cms, 'Apache/2.4.41', 'h', '/mcp');
 
-        // Setup must not overwrite an existing homepage.
+        // Setup must not overwrite an existing homepage or existing config.
         $this->assertSame('MY HOMEPAGE', file_get_contents($cms . '/pages/index.html'));
+        $this->assertSame('MYKEY', pw_parse_env((string) file_get_contents($cms . '/config.env'))['MCP_KEY']);
+    }
+
+    // ---- key generation & defense-in-depth deny rules --------------------
+
+    public function test_generate_mcp_key_is_64_hex_chars_and_unique(): void
+    {
+        $k = pw_generate_mcp_key();
+        $this->assertSame(64, strlen($k));
+        $this->assertTrue(ctype_xdigit($k));
+        $this->assertNotSame($k, pw_generate_mcp_key());
+    }
+
+    public function test_htaccess_content_denies_env_files(): void
+    {
+        $this->assertStringContainsString('.env', pw_htaccess_content());
+    }
+
+    public function test_nginx_content_denies_config_env(): void
+    {
+        $c = pw_nginx_content();
+        $this->assertStringContainsString('config\\.env', $c);
+        $this->assertStringContainsString('deny all', $c);
     }
 }

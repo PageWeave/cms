@@ -4,32 +4,85 @@ declare(strict_types=1);
 
 /**
  * ============================================================================
- *  PageWeave CMS — configuration
+ *  PageWeave CMS — configuration loader
  * ============================================================================
- *  Edit these constants, then upload this file as `index.php` to your web
- *  server's document root and visit your domain. Page serving works even with
- *  MCP_KEY empty; MCP simply stays disabled until you set it.
+ *  There are NO user-editable constants here. All operator configuration lives
+ *  in `_cms/config.env` (KEY=VALUE), auto-created on first run and preserved
+ *  across CMS updates — to update, just replace index.php.
+ *
+ *  `index.php` is pure code. Edit settings in `_cms/config.env`.
  * ============================================================================
  */
 
-// Bearer token that MCP clients must send. Use a long random string.
-// Generate one with, e.g.:  php -r 'echo bin2hex(random_bytes(32));'
-// Use at least 32 characters. Empty string => MCP disabled (site still serves).
-const MCP_KEY = '';
+const PW_CONFIG_FILE = 'config.env';
 
-// Where your source code lives. Shown as the "Source" link (AGPL §13).
-// If you run a modified version, point this at your published source.
-const SOURCE_URL = 'https://github.com/PageWeave/cms';
+/**
+ * Built-in default values for the four operator-editable settings. The single
+ * source for defaults: used both when `_cms/config.env` is absent/partial and
+ * when seeding the file on first run.
+ */
+function pw_config_defaults(): array
+{
+    return [
+        'mcpKey' => '',
+        'sourceUrl' => 'https://github.com/PageWeave/cms',
+        'siteUrl' => '',
+        'siteTitle' => 'My Site',
+    ];
+}
 
-// Optional canonical base URL (e.g. 'https://example.com'). When set, the
-// install page uses this host/scheme for the MCP endpoint instead of trusting
-// the client-supplied Host header. Strongly recommended on production sites.
-const SITE_URL = '';
+/**
+ * Load the resolved configuration by parsing `_cms/config.env` over the
+ * built-in defaults. Missing file / missing _cms dir => all defaults (MCP
+ * disabled). Never echoes or logs values.
+ */
+function pw_load_config(string $cmsDir): array
+{
+    $cfg = pw_config_defaults();
+    $env = pw_load_env_file($cmsDir . '/' . PW_CONFIG_FILE);
+    if ($env === []) {
+        return $cfg;
+    }
+    $map = [
+        'MCP_KEY' => 'mcpKey',
+        'SOURCE_URL' => 'sourceUrl',
+        'SITE_URL' => 'siteUrl',
+        'SITE_TITLE' => 'siteTitle',
+    ];
+    foreach ($map as $envKey => $cfgKey) {
+        if (array_key_exists($envKey, $env)) {
+            $cfg[$cfgKey] = $env[$envKey];
+        }
+    }
+    return $cfg;
+}
 
-// Fallback <title> for pages that do not set one.
-const SITE_TITLE = 'My Site';
+/**
+ * Build the contents of `_cms/config.env` from explicit values, with helpful
+ * comments. Values are always double-quoted so they round-trip safely through
+ * pw_parse_env (handles spaces in SITE_TITLE etc.).
+ */
+function pw_config_env_content(string $mcpKey, string $sourceUrl, string $siteTitle, string $siteUrl): string
+{
+    $q = static fn (string $v): string => '"' . str_replace('"', '', $v) . '"';
+    return <<<ENV
+# PageWeave CMS configuration.
+# Edit a value after "=" (quotes optional, required if it contains spaces).
+# To update the CMS itself, just replace index.php — this file is preserved.
 
-// Where the CMS stores its data. Defaults to a `_cms/` folder next to this
-// file (inside the web root, auto-protected). Point this outside the web root
-// (an absolute path) for extra safety.
-const CMS_DIR = __DIR__ . '/_cms';
+# Bearer token MCP clients must send. Empty => MCP disabled (site still serves).
+# Regenerate: php -r 'echo bin2hex(random_bytes(32));'
+MCP_KEY={$q($mcpKey)}
+
+# Where your source lives (AGPL §13 "Source" link). Modified versions must
+# point this at your published source.
+SOURCE_URL={$q($sourceUrl)}
+
+# Canonical base URL, e.g. "https://example.com". Strongly recommended on
+# production so the install page does not trust the client Host header.
+SITE_URL={$q($siteUrl)}
+
+# Fallback <title> for pages that do not set one.
+SITE_TITLE={$q($siteTitle)}
+ENV;
+}

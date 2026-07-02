@@ -47,23 +47,28 @@ php -S localhost:8000 -t dist # local server for manual smoke testing
 ## Architecture (where things live)
 
 ```
-src/config.php      # MCP_KEY, SOURCE_URL, SITE_TITLE, CMS_DIR — TOP of compiled file (user edits)
-src/bootstrap.php   # PHP 8.3 guard, error handling
-src/setup.php       # first-run: SERVER_SOFTWARE detect → write .htaccess/nginx → scaffold _cms/
-src/router.php      # REQUEST_URI + method → MCP / setup / page / 404
+src/env.php         # .env parser (KEY=VALUE), tolerant, zero runtime deps
+src/config.php      # config loader: parses _cms/config.env over defaults (NO user-editable consts)
+src/bootstrap.php   # PHP 8.3 guard, error handling, PW_CMS_DIR (fixed _cms/ path)
+src/setup.php       # first-run: SERVER_SOFTWARE detect → write .htaccess/nginx → scaffold _cms/ + config.env
+src/router.php      # REQUEST_URI + method → first-run setup → load config → MCP / page / 404
 src/transport.php   # /mcp: Bearer auth + stateless JSON-only Streamable HTTP JSON-RPC dispatch
 src/jsonrpc.php     # success()/error() envelopes (JSON-RPC 2.0)
 src/registry.php    # tool name → [inputSchema, handler]
 src/storage.php     # page/partial/asset CRUD + frontmatter parse/serialize
 src/render.php      # compose document: <head>+<title>+header+body+footer
-src/serve.php       # GET page serving + install/placeholder + 404
+src/serve.php       # GET page serving + install/placeholder + 404 (pure; setup is in router)
 src/tools/*.php     # one file per MCP tool
 build.php           # ordered concatenation → dist/index.php (pure PHP)
 ```
 
+**Configuration lives in `_cms/config.env`** (KEY=VALUE), auto-created on first run with a
+generated `MCP_KEY` and preserved across updates. `index.php` is pure code — to upgrade, replace
+it; to change settings, edit `_cms/config.env`. There are NO user-editable constants in the build.
+
 **Build is ordered concatenation:** `build.php` reads `src/` in a fixed dependency order, strips
 each file's leading `<?php`, wraps each in a `/* === src/foo.php === */` separator, and prepends a
-banner + the config block + a single `<?php`. Output: `dist/index.php`.
+banner + a single `<?php`. Output: `dist/index.php`.
 
 ## Key design decisions (do not regress)
 

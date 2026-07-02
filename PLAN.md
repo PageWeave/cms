@@ -18,7 +18,7 @@ the document head. A trimmed-down, open-source, self-hostable sibling of
 - One drop-in `index.php` that powers both the **website** (GET) and the **MCP server** (POST `/mcp`).
 - Manage pages, header/footer components, and the global `<head>` from an AI agent.
 - No database. Content stored as flat HTML files.
-- Zero-config install: upload the file, set `MCP_KEY`, visit the domain.
+- Zero-config install: upload the file, visit the domain (MCP key auto-generated into `_cms/config.env`).
 - Fully test-driven development (PHPUnit).
 
 ### Non-Goals (explicitly deferred)
@@ -136,14 +136,16 @@ On first visit (marker `_cms/.installed` absent), `index.php`:
    - `nginx` → writes `nginx.conf` (copy-paste + reload instructions; cannot auto-activate).
    - unknown → attempts `.htaccess` (harmless if unused).
 2. Creates `_cms/{partials,pages}` + default empty partials.
-3. Writes `_cms/pages/index.html` — a real, editable **"Installation successful"** page with:
+3. Writes `_cms/config.env` with a freshly generated `MCP_KEY` (`bin2hex(random_bytes(32))`)
+   and default `SOURCE_URL`/`SITE_TITLE`/`SITE_URL`. Never clobbers an existing file.
+4. Writes `_cms/pages/index.html` — a real, editable **"Installation successful"** page with:
    - detected server + rewrite-config status (or copy-paste box if not writable),
    - MCP endpoint URL `https://{host}/mcp`,
    - **OpenCode Desktop** setup snippet (`type:"remote"`, `url`, Bearer `headers`),
    - link to https://opencode.ai/docs/mcp-servers/,
-   - `MCP_KEY` status notice (if unset → "⚠️ set MCP_KEY in index.php"),
+   - MCP status notice pointing at `_cms/config.env` (the real key is never printed),
    - AGPL §13 "Source" link → `SOURCE_URL`.
-4. Writes the `.installed` marker.
+5. Writes the `.installed` marker.
 
 ### 2.6 MCP_KEY gating
 - `MCP_KEY` unset/placeholder → MCP **disabled**: any `POST /mcp` returns a clear
@@ -158,14 +160,23 @@ Assets are **public static files** (referenced by URL in HTML), so they live at 
 
 ---
 
-## 3. Configuration constants (top of compiled `index.php`)
+## 3. Configuration — `_cms/config.env`
 
-| Constant | Purpose | Default |
+Operator settings live in a `KEY=VALUE` file at `_cms/config.env`, auto-created on first run
+(with a generated MCP key) and preserved across CMS updates (just replace `index.php`). The
+compiled `index.php` is **pure code** — no user-editable constants. Parsed at request time by a
+hand-rolled, tolerant loader (`src/env.php`); values never logged or echoed.
+
+| Key | Purpose | Default |
 |---|---|---|
-| `MCP_KEY` | Bearer token for `/mcp`. Empty ⇒ MCP disabled. | `''` (must be set) |
+| `MCP_KEY` | Bearer token for `/mcp`. Empty ⇒ MCP disabled. | generated on first run (64 hex) |
+| `SITE_URL` | Canonical base URL; avoids trusting the `Host` header on the install page. | `''` |
 | `SOURCE_URL` | AGPL §13 source link target. | upstream repo URL |
 | `SITE_TITLE` | Fallback `<title>` when a page has none. | `'My Site'` |
-| `CMS_DIR` | `_cms/` location (absolute or webroot-relative). | `__DIR__ . '/_cms'` |
+
+`CMS_DIR` is **not** configurable — the data dir is fixed at `<docroot>/_cms` (`PW_CMS_DIR`).
+It is protected from direct access by generated `.htaccess`/nginx deny rules, so `_cms/config.env`
+is never served over HTTP.
 
 ---
 
@@ -197,8 +208,9 @@ Path traversal (`..`, leading slash) rejected; slugs normalized to safe path seg
 ```
 pageweave_cms/
 ├── src/
-│   ├── config.php        # MCP_KEY, SOURCE_URL, SITE_TITLE, CMS_DIR — TOP of build
-│   ├── bootstrap.php     # PHP 8.3 guard, error handling, base path
+│   ├── env.php           # .env parser (KEY=VALUE), tolerant, zero deps
+│   ├── config.php        # config loader: _cms/config.env -> resolved values + defaults
+│   ├── bootstrap.php     # PHP 8.3 guard, error handling, PW_CMS_DIR
 │   ├── setup.php         # first-run: detect server, write .htaccess/nginx, scaffold _cms/
 │   ├── router.php        # REQUEST_URI + method → MCP / setup / page / 404
 │   ├── transport.php     # auth + JSON-RPC 2.0 dispatch (stateless, JSON-only)
@@ -224,7 +236,7 @@ Pure concatenation (no PHAR / scoper needed — zero deps):
 1. Read `src/` files in a fixed dependency order.
 2. Strip each file's leading `<?php`, trim.
 3. Wrap each with a `/* === src/foo.php === */` separator for readability.
-4. Prepend a banner (title, version, setup instructions, AGPL notice) + the config block + a single `<?php`.
+4. Prepend a banner (title, version, setup instructions, AGPL notice) + a single `<?php`.
 5. Output `dist/index.php` (~1500 lines, readable).
 
 ### 5.2 Testability principle

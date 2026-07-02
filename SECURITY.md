@@ -34,13 +34,14 @@ each GitHub Release is the supported artifact.
 ## Threat model & security model
 
 PageWeave is designed to run on commodity shared hosting (PHP-FPM, Apache,
-LiteSpeed, or nginx). The operator uploads `index.php`, sets `MCP_KEY`, and
-visits their domain.
+LiteSpeed, or nginx). The operator uploads `index.php` and visits their domain;
+on first run a random `MCP_KEY` is generated into `_cms/config.env` (which is
+protected from direct web access by generated deny rules).
 
 - **Single static bearer secret.** MCP requests authenticate with
   `Authorization: Bearer <MCP_KEY>`. Comparison is constant-time
-  (`hash_equals`). An empty `MCP_KEY` disables MCP; the site still serves.
-  Use a strong key (≥ 32 random bytes).
+  (`hash_equals`). An empty `MCP_KEY` (e.g. if the operator blanks it in
+  `_cms/config.env`) disables MCP; the site still serves.
 - **Stateless, no sessions, no OAuth, no SSE.** Every MCP request is
   independently authenticated. Per the MCP *Security Best Practices*, this
   design is not subject to the confused-deputy, token-passthrough,
@@ -57,9 +58,12 @@ visits their domain.
 
 ### Operator hardening checklist
 
-- Set `MCP_KEY` to ≥ 32 random bytes.
+- `MCP_KEY` is auto-generated (64 hex chars) on first run; rotate it by editing
+  `_cms/config.env` if you suspect compromise.
 - Set `SITE_URL` to your canonical URL (avoids trusting the `Host` header).
-- Point `CMS_DIR` to a path **outside** the web root where possible.
+- Keep the generated `.htaccess`/`nginx.conf` deny rules in place —
+  `_cms/config.env` holds your MCP key and must never be web-accessible. The
+  `_cms/` data dir is fixed at `<docroot>/_cms` (not relocatable).
 - On nginx, copy the generated `nginx.conf` into your server block.
 - Serve over HTTPS (consider adding HSTS + a CSP via the head partial).
 
@@ -86,7 +90,12 @@ links conceptually to the fixing commit.
   upgrading, delete that file and revisit the domain to regenerate a clean
   install page (or set `SITE_URL` and re-create the homepage via MCP).
 - Upgrading is a single-file replacement: drop in the new `index.php`. Stored
-  `_cms/` content is unaffected.
+  `_cms/` content — including `_cms/config.env` — is unaffected.
+- **0.1.x → config.env migration:** earlier versions stored `MCP_KEY` (and other
+  settings) as constants at the top of `index.php`. After replacing `index.php`,
+  those constants are gone; on first run a fresh `_cms/config.env` with a newly
+  generated key is written. Copy your old `MCP_KEY` into `_cms/config.env` to
+  keep existing MCP clients working.
 
 ## Scope
 

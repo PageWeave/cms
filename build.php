@@ -8,7 +8,7 @@ declare(strict_types=1);
  * Strategy: ordered concatenation. For each file, strip the leading `<?php`
  * tag and the file-level `declare(strict_types=1);` (the build re-adds one
  * exactly once at the top). Wrap each file in a separator comment. Prepend a
- * banner + the config block (so it stays at the very top for users to edit).
+ * banner with setup instructions (config lives in _cms/config.env, not here).
  * Append the front-controller entry call as the final statement.
  *
  * Usage:  php build.php
@@ -20,6 +20,7 @@ const DIST_FILE = __DIR__ . '/dist/index.php';
 function pw_build_files(): array
 {
     $core = [
+        'env.php',
         'config.php',
         'bootstrap.php',
         'storage.php',
@@ -58,16 +59,18 @@ function pw_banner(string $version): string
  *  A self-hostable, single-file PHP CMS with a built-in MCP server.
  *
  *  QUICK START
- *    1. Set MCP_KEY below to a long random string (>= 32 chars) to enable the
- *       /mcp endpoint. Generate one:
- *         php -r 'echo bin2hex(random_bytes(32));'
- *    2. (Recommended) Set SITE_URL to your canonical URL, e.g.
- *       'https://example.com' — used for the install-page MCP endpoint instead
- *       of trusting the client Host header.
- *    3. Upload THIS file as `index.php` to your web server's document root.
- *    4. Visit your domain — first run auto-configures routing and shows setup.
+ *    1. Upload THIS file as `index.php` to your web server's document root.
+ *    2. Visit your domain — first run auto-configures routing, scaffolds the
+ *       _cms/ data dir, and writes _cms/config.env with a generated MCP key,
+ *       then shows the installation page.
+ *    3. Open _cms/config.env to view or change settings (MCP key, site title,
+ *       source URL, canonical site URL).
  *
- *  Page serving works even with MCP_KEY empty; MCP is disabled until you set it.
+ *  TO UPDATE the CMS later: just replace this one file. Your _cms/ data and
+ *  config.env are preserved automatically — nothing to reconfigure.
+ *
+ *  Page serving works out of the box; MCP is ready immediately (a key is
+ *  generated on first run — find it in _cms/config.env).
  *
  *  LICENSE: AGPL-3.0-or-later. Running a modified version on a public server
  *  requires offering the source to its users (AGPL §13) — point SOURCE_URL at
