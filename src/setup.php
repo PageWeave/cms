@@ -117,9 +117,19 @@ function pw_install_page_html(string $host, string $mcpPath, bool $mcpEnabled, s
 {
     $safeHost = htmlspecialchars($host, ENT_QUOTES, 'UTF-8');
     $endpoint = $scheme . '://' . $safeHost . $mcpPath;
+
+    $hostSlug = preg_replace('/[^a-z0-9]+/', '-', strtolower($host));
+    $hostSlug = trim($hostSlug, '-');
+    if (mb_strlen($hostSlug) > 40) {
+        $hostSlug = mb_substr($hostSlug, 0, 40);
+    }
+    if ($hostSlug === '') {
+        $hostSlug = 'pageweave';
+    }
+
     $snippet = json_encode([
         'mcp' => [
-            'pageweave-cms' => [
+            $hostSlug . '-pageweave-cms' => [
                 'type' => 'remote',
                 'url' => $scheme . '://' . $host . $mcpPath,
                 'headers' => ['Authorization' => 'Bearer YOUR_MCP_KEY'],
