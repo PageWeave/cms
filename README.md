@@ -1,12 +1,20 @@
-<p align="center"><img src="icon.svg" width="80" alt="PageWeave"></p>
+<div align="center">
+
+<img src="icon.svg" width="80" alt="PageWeave">
 
 # PageWeave CMS
 
-A self-hostable, single-file PHP CMS that lets your AI agent build and edit your website over MCP. Drop one `index.php` on a server, set an API key, done.
+*A self-hostable, single-file PHP CMS that lets your AI agent<br>build and edit your website over MCP. Drop one `index.php`<br>on a server, set an API key, done.*
 
----
+<br>
 
-> **PageWeave just launched.** The first **100 customers** lock in **€19/month per website — forever**. That price applies to *every* Pro website on your account, past and future, even after the offer ends. **[Lock in early adopter pricing →](https://pageweave.dev/create-account)**
+**PageWeave just launched. The first 100 customers lock in<br>&euro;19/month per website — forever.**<br>
+*That price applies to every Pro website on your account,<br>past and future, even after the offer ends.*<br>
+[**Lock in early adopter pricing &rarr;**](https://pageweave.dev/create-account)
+
+<br>
+
+</div>
 
 ---
 
