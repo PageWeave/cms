@@ -117,13 +117,16 @@ function pw_mcp_tool_registry(): array
             'handler' => 'pw_tool_update_component',
         ],
         'get_html_head' => [
-            'description' => 'Read the global <head> partial (meta, favicon, CSS links).',
+            'description' => 'Read the contents placed inside the CMS-generated <head> element '
+                . '(meta tags, favicon links, CSS/JS links, inline styles).',
             'inputSchema' => ['type' => 'object', 'properties' => new \stdClass(), 'required' => []],
             'handler' => 'pw_tool_get_html_head',
         ],
         'update_html_head' => [
-            'description' => 'Write the global <head> partial. A <title> is auto-injected per page, '
-                . 'so do not include one here.',
+            'description' => 'Write the contents placed inside the CMS-generated <head> element. '
+                . 'Use only inner <head> children such as <meta>, <link>, <script>, and <style>. '
+                . 'Do NOT include <!DOCTYPE>, <html>, <head>, <body>, or <title> tags '
+                . '(the CMS injects those automatically; the title comes from each page).',
             'inputSchema' => [
                 'type' => 'object',
                 'properties' => ['html' => $htmlSchema],

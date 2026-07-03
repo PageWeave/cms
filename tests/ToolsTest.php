@@ -202,6 +202,38 @@ final class ToolsTest extends PwTestCase
         $this->assertSame('/assets/logo.png', $data['assets'][0]['url']);
     }
 
+    public function test_update_html_head_accepts_valid_inner_head_content(): void
+    {
+        $html = "<meta charset=\"UTF-8\">\n<link rel=\"stylesheet\" href=\"/style.css\">\n<script src=\"/app.js\"\u003e\u003c/script\u003e\n<style\u003ebody{margin:0}\u003c/style\u003e";
+        $r = pw_tool_update_html_head(['html' => $html], $this->ctx());
+        $this->assertFalse($r['isError']);
+        $data = $this->decode(pw_tool_get_html_head([], $this->ctx()));
+        $this->assertSame($html, $data['html']);
+    }
+
+    public static function forbiddenHeadTagProvider(): array
+    {
+        return [
+            'doctype' => ['<!DOCTYPE html>', 'DOCTYPE'],
+            'html open' => ['<html lang="en">', 'html'],
+            'html close' => ['</html>', 'html'],
+            'head open' => ['<head>', 'head'],
+            'head close' => ['</head>', 'head'],
+            'body open' => ['<body class="x">', 'body'],
+            'body close' => ['</body>', 'body'],
+            'title open' => ['<title>X</title>', 'title'],
+            'title self close' => ['<title />', 'title'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('forbiddenHeadTagProvider')]
+    public function test_update_html_head_rejects_forbidden_tag(string $html, string $tag): void
+    {
+        $r = pw_tool_update_html_head(['html' => $html], $this->ctx());
+        $this->assertTrue($r['isError'], "expected error for {$tag}");
+        $this->assertStringContainsStringIgnoringCase($tag, $r['content'][0]['text']);
+    }
+
     // ---- Tier 3: replacements cap + exception leak ------------------------
 
     public function test_update_page_replacements_capped_at_ten(): void
