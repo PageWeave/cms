@@ -124,7 +124,7 @@ PageWeave CMS gives you powerful MCP content management you run yourself. [PageW
 
 ## Recommended coding agent
 
-We recommend **[OpenCode Desktop](https://opencode.ai)** or **[OpenCode Go](https://opencode.ai/go?ref=511XQWT93A)** *(affiliate link)* as your MCP client. OpenCode is purpose-built for agent-driven software work and connects to PageWeave CMS in one config block.
+We recommend **[OpenCode Desktop](https://opencode.ai)** as your agent harness with **[OpenCode Go](https://opencode.ai/go?ref=511XQWT93A)** *(affiliate link)* coding plan. OpenCode is purpose-built for agent-driven software work and connects to PageWeave CMS in one config block.
 
 ---
 
