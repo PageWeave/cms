@@ -8,9 +8,8 @@
 
 <br>
 
-**PageWeave just launched. The first 100 customers lock in<br>&euro;19/month per website — forever.**<br>
-*That price applies to every Pro website on your account,<br>past and future, even after the offer ends.*<br>
-[**Lock in early adopter pricing &rarr;**](https://pageweave.dev/create-account)
+[**Download `index.php` from the latest release &rarr;**](../../releases/latest)<br>
+*Or run `php build.php` to compile it yourself.*
 
 <br>
 
@@ -99,7 +98,7 @@ Replace `index.php` with the new version. Your `_cms/` data and `_cms/config.env
 
 ## PageWeave CMS vs PageWeave Cloud
 
-PageWeave CMS gives you powerful MCP content management you run yourself. [PageWeave Cloud](https://pageweave.dev/) takes the same idea and adds a fully managed production suite — so you focus on building, not operating.
+PageWeave CMS gives you MCP content management on a server you control. [PageWeave Cloud](https://pageweave.dev/) is the managed sibling if you prefer not to operate it yourself.
 
 | | PageWeave CMS | PageWeave Cloud |
 |---|---|---|
@@ -117,8 +116,6 @@ PageWeave CMS gives you powerful MCP content management you run yourself. [PageW
 | **Team access** | — | Invite admins, editors, viewers. |
 | **Deployment** | Drop one PHP file on your server | Nothing to deploy. Fully managed. |
 | **Hosting** | Self-hosted | German servers. GDPR compliant. European company. |
-
-**Ready for the full suite?** [Try PageWeave Cloud — free to start, no credit card →](https://pageweave.dev/create-account)
 
 ---
 
